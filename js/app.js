@@ -919,6 +919,13 @@ async function openAIPlan(p){
       <div class="spot-loading">🔎 Google Placesから最新の施設情報を確認中…</div>
     </div>
 
+    <div class="form-card">
+      <h3>🗓️ 今日1日のプラン</h3>
+      <p style="line-height:1.7;">この場所を中心に、昼食・午後のお出かけ・帰宅までAIが組み立てます。</p>
+      <button class="primary" id="makeDayPlanV14" style="width:100%;">✨ この場所を中心に1日プランを作る</button>
+      <div id="dayPlanV14Box" style="margin-top:12px;"></div>
+    </div>
+
     <div class="detail-actions">
       <button class="secondary" data-go2="home">← 戻る</button>
       <button class="primary" id="navStart">🚗 この場所へ行く</button>
@@ -935,6 +942,9 @@ async function openAIPlan(p){
       alert("この施設の位置情報がありません。");
     }
   };
+
+  const dayPlanButton=$("#makeDayPlanV14");
+  if(dayPlanButton) dayPlanButton.onclick=()=>generateDayPlanV14(s);
 
   go("detail");
 
@@ -1000,6 +1010,79 @@ async function openAIPlan(p){
       <p>⚠️ 施設詳細を取得できませんでした。</p>
       <p><small>${escapeHtmlGoogle(error?.message||"")}</small></p>
       <p><small>営業時間・料金・設備は出発前に公式情報を確認してください。</small></p>`;
+  }
+}
+
+
+async function generateDayPlanV14(mainSpot){
+  const box=$("#dayPlanV14Box");
+  const button=$("#makeDayPlanV14");
+  if(!box)return;
+
+  if(!Array.isArray(latestWeekendCandidates)||!latestWeekendCandidates.length){
+    box.innerHTML="<p>⚠️ 1日プラン用の候補施設がありません。ホームで実在スポットを取得してからお試しください。</p>";
+    return;
+  }
+
+  if(button){
+    button.disabled=true;
+    button.textContent="✨ AIが1日プランを作成中…";
+  }
+  box.innerHTML='<div class="spot-loading">🤖 無理のない1日を組み立てています…</div>';
+
+  try{
+    const candidates=[
+      mainSpot,
+      ...latestWeekendCandidates.filter(x=>x?.id&&x.id!==mainSpot?.id)
+    ].filter((x,i,a)=>x?.id&&a.findIndex(y=>y?.id===x.id)===i).slice(0,30);
+
+    const response=await fetch(`${WEEKEND_AI_API}/day-plan-v14`,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        candidates,
+        conditions:{
+          mainPlaceId:mainSpot?.id||"",
+          mainPlaceName:mainSpot?.name||"",
+          requestType:"selected_main_place_day_plan",
+          note:"mainPlaceIdの施設をメイン候補として優先し、無理のない1日プランを作る"
+        }
+      })
+    });
+
+    const result=await response.json().catch(()=>null);
+    if(!response.ok||!result?.ok){
+      throw new Error(result?.detail||result?.error||`HTTP ${response.status}`);
+    }
+
+    const plan=result.dayPlan||{};
+    const timeline=Array.isArray(plan.timeline)?plan.timeline:[];
+    const icon=t=>t==="departure"?"🏠":t==="spot"?"📍":t==="lunch"?"🍴":t==="return"?"🏠":"🕒";
+
+    const rows=timeline.length?timeline.map(item=>`
+      <div style="display:grid;grid-template-columns:58px 30px 1fr;gap:6px;align-items:start;padding:10px 0;border-bottom:1px solid rgba(0,0,0,.08);">
+        <b>${escapeHtmlGoogle(item?.time||"")}</b>
+        <span>${icon(item?.type)}</span>
+        <div><b>${escapeHtmlGoogle(item?.title||"")}</b>
+        ${item?.note?`<div style="margin-top:4px;line-height:1.6;"><small>${escapeHtmlGoogle(item.note)}</small></div>`:""}</div>
+      </div>`).join(""):"<p>タイムライン情報がありません。</p>";
+
+    box.innerHTML=`
+      <div style="margin-top:12px;">
+        <h3>${escapeHtmlGoogle(plan.title||"今日の1日お出かけプラン")}</h3>
+        ${plan.summary?`<p style="line-height:1.7;">${escapeHtmlGoogle(plan.summary)}</p>`:""}
+        <div>${rows}</div>
+        ${plan.reason?`<div style="margin-top:12px;"><b>✨ このプランにした理由</b><p style="line-height:1.7;">${escapeHtmlGoogle(plan.reason)}</p></div>`:""}
+        <p><small>⚠️ ${escapeHtmlGoogle(plan.caution||"営業時間・料金・設備などは出発前に公式情報をご確認ください。")}</small></p>
+      </div>`;
+  }catch(error){
+    console.error("v1.4 1日プラン作成エラー",error);
+    box.innerHTML=`<p>⚠️ 1日プランを作成できませんでした。</p><p><small>${escapeHtmlGoogle(error?.message||"")}</small></p>`;
+  }finally{
+    if(button){
+      button.disabled=false;
+      button.textContent="✨ この場所を中心に1日プランを作り直す";
+    }
   }
 }
 
