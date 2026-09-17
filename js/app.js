@@ -919,6 +919,11 @@ async function openAIPlan(p){
       <div class="spot-loading">🔎 Google Placesから最新の施設情報を確認中…</div>
     </div>
 
+    <div class="form-card" id="routeV15Box">
+      <h3>🚗 現在地からの車ルート</h3>
+      <div class="spot-loading">施設の位置情報を確認中…</div>
+    </div>
+
     <div class="form-card">
       <h3>🗓️ 今日1日のプラン</h3>
       <p style="line-height:1.7;">この場所を中心に、昼食・午後のお出かけ・帰宅までAIが組み立てます。</p>
@@ -1003,6 +1008,10 @@ async function openAIPlan(p){
       ${websiteHtml}
       ${mapsHtml}
       <p><small>⚠️ 営業時間・料金・設備は変更される場合があります。出発前に公式情報をご確認ください。</small></p>`;
+
+    // v1.5: Place Detailsで得た目的地座標を使って実際の車ルートを取得
+    await loadRouteV15(place);
+
   }catch(error){
     console.error("v1.3 施設詳細取得エラー",error);
     box.innerHTML=`
@@ -1013,6 +1022,81 @@ async function openAIPlan(p){
   }
 }
 
+
+
+async function loadRouteV15(place){
+  const routeBox=$("#routeV15Box");
+  if(!routeBox)return;
+
+  const saved=JSON.parse(localStorage.getItem("weekend_ai_coords_v1")||"null");
+  const originLat=Number(saved?.latitude);
+  const originLon=Number(saved?.longitude);
+  const destinationLat=Number(place?.lat);
+  const destinationLon=Number(place?.lon);
+
+  if(
+    !Number.isFinite(originLat)||
+    !Number.isFinite(originLon)
+  ){
+    routeBox.innerHTML=`
+      <h3>🚗 現在地からの車ルート</h3>
+      <p>📍 現在地が未取得です。</p>
+      <p><small>ホームで「現在地を取得」を押すと、実際の車ルートを計算できます。</small></p>`;
+    return;
+  }
+
+  if(
+    !Number.isFinite(destinationLat)||
+    !Number.isFinite(destinationLon)
+  ){
+    routeBox.innerHTML=`
+      <h3>🚗 現在地からの車ルート</h3>
+      <p>⚠️ この施設の位置情報を取得できませんでした。</p>`;
+    return;
+  }
+
+  routeBox.innerHTML=`
+    <h3>🚗 現在地からの車ルート</h3>
+    <div class="spot-loading">🛣️ Google Routesで実際の道路ルートを計算中…</div>`;
+
+  try{
+    const response=await fetch(`${WEEKEND_AI_API}/route-v15`,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        origin:{lat:originLat,lon:originLon},
+        destination:{lat:destinationLat,lon:destinationLon}
+      })
+    });
+
+    const result=await response.json().catch(()=>null);
+
+    if(!response.ok||!result?.ok){
+      throw new Error(result?.detail||result?.error||`HTTP ${response.status}`);
+    }
+
+    const route=result.route||{};
+    routeBox.innerHTML=`
+      <h3>🚗 現在地からの車ルート</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+        <div style="padding:12px;border-radius:14px;background:rgba(255,255,255,.65);text-align:center;">
+          <small>走行距離</small>
+          <div style="font-size:1.25rem;font-weight:700;margin-top:4px;">${escapeHtmlGoogle(route.displayDistance||"情報なし")}</div>
+        </div>
+        <div style="padding:12px;border-radius:14px;background:rgba(255,255,255,.65);text-align:center;">
+          <small>車の所要時間</small>
+          <div style="font-size:1.25rem;font-weight:700;margin-top:4px;">約 ${escapeHtmlGoogle(route.displayDuration||"情報なし")}</div>
+        </div>
+      </div>
+      <p style="margin-top:10px;"><small>🛣️ Google Routes APIによる道路ルートを使用しています。交通状況などにより実際の時間は変わる場合があります。</small></p>`;
+  }catch(error){
+    console.error("v1.5 ルート取得エラー",error);
+    routeBox.innerHTML=`
+      <h3>🚗 現在地からの車ルート</h3>
+      <p>⚠️ 車ルートを取得できませんでした。</p>
+      <p><small>${escapeHtmlGoogle(error?.message||"")}</small></p>`;
+  }
+}
 
 async function generateDayPlanV14(mainSpot){
   const box=$("#dayPlanV14Box");
