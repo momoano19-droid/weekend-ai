@@ -1174,14 +1174,6 @@ if (!currentPosition) {
       mainSpot,
       ...latestWeekendCandidates.filter(x=>x?.id&&x.id!==mainSpot?.id)
     ].filter((x,i,a)=>x?.id&&a.findIndex(y=>y?.id===x.id)===i).slice(0,30);
-
-   alert(
-  "【v1.6 ID確認】\n" +
-  "mainSpot.id = " + String(mainSpot?.id || "なし") + "\n\n" +
-  "candidates[0].id = " + String(candidates?.[0]?.id || "なし") + "\n\n" +
-  "一致 = " + (String(mainSpot?.id || "") === String(candidates?.[0]?.id || ""))
-);
-
     const response = await fetch(`${WEEKEND_AI_API}/day-plan-v16`, {
       method:"POST",
       headers:{"Content-Type":"application/json"},
@@ -1213,6 +1205,8 @@ if (!currentPosition) {
    const routes = plan.routes || {};
 
 const homeToMain = routes.homeToMain || null;
+const mainToLunch = routes.mainToLunch || null;
+const lunchToAfternoon = routes.lunchToAfternoon || null;
 const mainToAfternoon = routes.mainToAfternoon || null;
 const lastToHome = routes.lastToHome || null;
 
@@ -1255,15 +1249,35 @@ const shortenedForReturnTime =
   }
 
   ${
-    mainToAfternoon
+    mainToLunch
       ? `
         <div style="margin-bottom:5px;">
-          📍 メイン施設 → 午後スポット：
-          約${escapeHtml(String(mainToAfternoon.durationMinutes))}分 /
-          ${escapeHtml(String(mainToAfternoon.distanceKm))}km
+          🍴 メイン施設 → ランチ：
+          約${escapeHtml(String(mainToLunch.durationMinutes))}分 /
+          ${escapeHtml(String(mainToLunch.distanceKm))}km
         </div>
       `
       : ""
+  }
+
+  ${
+    lunchToAfternoon
+      ? `
+        <div style="margin-bottom:5px;">
+          📍 ランチ → 午後スポット：
+          約${escapeHtml(String(lunchToAfternoon.durationMinutes))}分 /
+          ${escapeHtml(String(lunchToAfternoon.distanceKm))}km
+        </div>
+      `
+      : mainToAfternoon
+        ? `
+          <div style="margin-bottom:5px;">
+            📍 メイン施設 → 午後スポット：
+            約${escapeHtml(String(mainToAfternoon.durationMinutes))}分 /
+            ${escapeHtml(String(mainToAfternoon.distanceKm))}km
+          </div>
+        `
+        : ""
   }
 
   ${
