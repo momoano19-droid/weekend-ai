@@ -1180,6 +1180,13 @@ if (!currentPosition) {
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
         candidates,
+       origin: {
+  lat: Number(currentPosition?.lat),
+  lon: Number(currentPosition?.lon),
+},
+
+       mainPlaceId: String(mainSpot?.id || ""),
+       
         conditions:{
           mainPlaceId:mainSpot?.id||"",
           mainPlaceName:mainSpot?.name||"",
