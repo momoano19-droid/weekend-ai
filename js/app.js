@@ -111,3 +111,86 @@ $("#manualLocationBtn").onclick=async()=>{
 };
 const savedCoords=JSON.parse(localStorage.getItem("weekend_ai_coords_v1")||"null");
 if(savedCoords) loadWeather(savedCoords.latitude,savedCoords.longitude).catch(()=>{});
+
+
+// ===== v0.5 OpenStreetMap / Overpass 実在スポット候補 =====
+function kmBetween(a,b,c,d){
+  const R=6371, rad=x=>x*Math.PI/180;
+  const dLat=rad(c-a), dLon=rad(d-b);
+  const h=Math.sin(dLat/2)**2+Math.cos(rad(a))*Math.cos(rad(c))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+function spotKind(tags={}){
+  const v=tags.tourism||tags.leisure||tags.amenity||"";
+  const map={
+    aquarium:["🐠","水族館"],zoo:["🦁","動物園"],museum:["🏛️","博物館・資料館"],
+    theme_park:["🎡","テーマパーク"],attraction:["✨","観光スポット"],
+    park:["🌳","公園"],playground:["🛝","遊び場"],nature_reserve:["🌿","自然"],
+    arts_centre:["🎨","文化・体験施設"]
+  };
+  return map[v]||["📍","お出かけスポット"];
+}
+function renderRealSpots(spots,lat,lon){
+  const box=$("#realSpotCards");
+  if(!spots.length){box.innerHTML='<div class="spot-loading">周辺で条件に合う登録スポットが見つかりませんでした。</div>';return}
+  box.innerHTML=spots.slice(0,12).map(x=>{
+    const t=x.tags||{}, k=spotKind(t), la=x.lat??x.center?.lat, lo=x.lon??x.center?.lon;
+    const dist=(la!=null&&lo!=null)?kmBetween(lat,lon,la,lo):null;
+    return `<div class="real-spot"><div class="real-spot-icon">${k[0]}</div><div class="real-spot-main"><b>${escapeHtml(t.name||"名称未登録")}</b><small>${k[1]}${t["addr:city"]?" ・ "+escapeHtml(t["addr:city"]):""}</small></div><div class="real-spot-distance">${dist!=null?dist.toFixed(1)+" km":""}</div></div>`;
+  }).join("");
+}
+async function fetchRealSpots(lat,lon){
+  $("#spotStatus").textContent="検索中…";
+  $("#realSpotCards").innerHTML='<div class="spot-loading">🔎 現在地周辺の実在スポットを探しています…</div>';
+  const radius=30000;
+  const filters=[
+    '["tourism"~"aquarium|zoo|museum|theme_park|attraction"]',
+    '["leisure"~"park|playground|nature_reserve"]',
+    '["amenity"="arts_centre"]'
+  ];
+  const body=filters.map(f=>`nwr(around:${radius},${lat},${lon})${f}["name"];`).join("");
+  const query=`[out:json][timeout:25];(${body});out center tags;`;
+  try{
+    const r=await fetch("https://overpass-api.de/api/interpreter",{
+      method:"POST",
+      headers:{"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},
+      body:"data="+encodeURIComponent(query)
+    });
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const data=await r.json();
+    const seen=new Set();
+    const spots=(data.elements||[]).filter(x=>{
+      const n=x.tags?.name; if(!n||seen.has(n))return false; seen.add(n); return true;
+    }).sort((a,b)=>{
+      const ac=a.lat??a.center?.lat, ao=a.lon??a.center?.lon, bc=b.lat??b.center?.lat, bo=b.lon??b.center?.lon;
+      return kmBetween(lat,lon,ac,ao)-kmBetween(lat,lon,bc,bo);
+    });
+    $("#spotStatus").textContent=`${spots.length}件見つかりました`;
+    renderRealSpots(spots,lat,lon);
+  }catch(e){
+    $("#spotStatus").textContent="検索失敗";
+    $("#realSpotCards").innerHTML='<div class="spot-loading">施設検索サーバーが混雑している可能性があります。少し時間を空けてもう一度お試しください。</div>';
+  }
+}
+async function searchRealSpotsFromSavedLocation(){
+  const c=JSON.parse(localStorage.getItem("weekend_ai_coords_v1")||"null");
+  if(!c){$("#spotStatus").textContent="先に現在地を取得してください";return}
+  await fetchRealSpots(c.latitude,c.longitude);
+}
+// 現在地取得成功後、施設候補も更新
+const originalUseCurrentLocation=useCurrentLocation;
+useCurrentLocation=function(){
+  if(!navigator.geolocation){alert("このブラウザは位置情報に対応していません。場所入力を使ってください。");return}
+  $("#weatherText").textContent="取得中…";
+  navigator.geolocation.getCurrentPosition(async pos=>{
+    try{
+      const {latitude,longitude}=pos.coords;
+      setPlaceLabel("現在地");
+      localStorage.setItem("weekend_ai_coords_v1",JSON.stringify({latitude,longitude}));
+      await loadWeather(latitude,longitude);
+      await fetchRealSpots(latitude,longitude);
+    }catch(e){$("#weatherText").textContent="取得失敗";alert("現在地データの取得中にエラーが発生しました。")}
+  },()=>{ $("#weatherText").textContent="未取得"; alert("位置情報を取得できませんでした。"); },
+  {enableHighAccuracy:true,timeout:10000,maximumAge:300000});
+};
+$("#getLocationBtn").onclick=useCurrentLocation;

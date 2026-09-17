@@ -28,3 +28,10 @@ body{background:#edf3ee}.topbar{background:rgba(255,253,248,.95)}.brand:before{c
 .location-tools{display:flex;gap:7px;margin-top:11px;flex-wrap:wrap}
 .location-tools button{border:0;border-radius:999px;background:#edf7ef;color:#397550;padding:7px 10px;font-size:10px;font-weight:800;cursor:pointer}
 .location-tools button:last-child{background:#fff7e7;color:#88703b}
+
+/* v0.5 実在スポット候補 */
+.nearby-section{margin-top:24px}.spot-status{font-size:9px;color:#829187;background:#f0f5f0;border-radius:999px;padding:6px 9px}
+.real-spot-cards{display:grid;gap:9px}.real-spot{background:#fff;border:1px solid #e9eee9;border-radius:17px;padding:12px;display:flex;gap:11px;align-items:center;box-shadow:0 5px 16px #4059470b}
+.real-spot-icon{width:44px;height:44px;border-radius:14px;background:#edf8f1;display:grid;place-items:center;font-size:23px;flex:none}
+.real-spot-main{min-width:0;flex:1}.real-spot-main b{font-size:13px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.real-spot-main small{font-size:10px;color:#87928b}.real-spot-distance{font-size:11px;font-weight:900;color:#4e9367;white-space:nowrap}.osm-credit{text-align:right;font-size:8px;color:#a0aaa3;margin-top:7px}
+.spot-loading{padding:17px;text-align:center;color:#7d8d83;background:#f8fbf8;border-radius:17px;font-size:11px}
