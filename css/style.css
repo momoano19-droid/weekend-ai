@@ -38,3 +38,6 @@ body{background:#edf3ee}.topbar{background:rgba(255,253,248,.95)}.brand:before{c
 
 .retry-spots{margin-top:10px;border:0;border-radius:999px;background:#5aa876;color:white;padding:8px 13px;font-size:10px;font-weight:800;cursor:pointer}
 .spot-loading small{display:inline-block;margin-top:5px;color:#98a29c}
+/* v1.1 */
+.spot-refresh-btn{width:100%;margin:0 0 12px;padding:13px 14px;border:1px solid #d8eadc;border-radius:14px;background:#fff;color:#397550;font-size:13px;font-weight:800;cursor:pointer}
+.real-spot-rating{margin-top:3px;font-size:10px;font-weight:800;color:#b17b1f}
