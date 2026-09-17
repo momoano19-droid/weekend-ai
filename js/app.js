@@ -92,7 +92,19 @@ async function useCurrentLocation(){
   $("#weatherText").textContent="取得中…";
   navigator.geolocation.getCurrentPosition(async pos=>{
     try{
-      const {latitude,longitude}=pos.coords;
+      const { latitude, longitude, accuracy } = pos.coords;
+
+console.log("===== 週末AI 現在地確認 =====");
+console.log("緯度:", latitude);
+console.log("経度:", longitude);
+console.log("位置情報の精度:", accuracy, "m");
+
+alert(
+  "週末AIが取得した位置情報\n\n" +
+  "緯度：" + latitude.toFixed(6) + "\n" +
+  "経度：" + longitude.toFixed(6) + "\n" +
+  "精度：±" + Math.round(accuracy) + "m"
+);
       setPlaceLabel("現在地");
       localStorage.setItem("weekend_ai_coords_v1",JSON.stringify({latitude,longitude}));
       await loadWeather(latitude,longitude);
@@ -452,7 +464,11 @@ async function testGoogleV08() {
     }
     return;
   }
-
+alert(
+  "v0.8検索で使用する保存座標\n\n" +
+  "緯度：" + Number(coords.latitude).toFixed(6) + "\n" +
+  "経度：" + Number(coords.longitude).toFixed(6)
+);
   if (status) {
     status.textContent = "v0.8：50km圏をカテゴリ別に検索中…";
   }
