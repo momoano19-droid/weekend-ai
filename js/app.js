@@ -1175,6 +1175,13 @@ if (!currentPosition) {
       ...latestWeekendCandidates.filter(x=>x?.id&&x.id!==mainSpot?.id)
     ].filter((x,i,a)=>x?.id&&a.findIndex(y=>y?.id===x.id)===i).slice(0,30);
 
+   alert(
+  "【v1.6 ID確認】\n" +
+  "mainSpot.id = " + String(mainSpot?.id || "なし") + "\n\n" +
+  "candidates[0].id = " + String(candidates?.[0]?.id || "なし") + "\n\n" +
+  "一致 = " + (String(mainSpot?.id || "") === String(candidates?.[0]?.id || ""))
+);
+
     const response = await fetch(`${WEEKEND_AI_API}/day-plan-v16`, {
       method:"POST",
       headers:{"Content-Type":"application/json"},
