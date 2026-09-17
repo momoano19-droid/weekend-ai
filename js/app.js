@@ -191,12 +191,14 @@ useCurrentLocation=function(){
     setPlaceLabel("現在地");
     localStorage.setItem("weekend_ai_coords_v1",JSON.stringify({latitude,longitude}));
     try{await loadWeather(latitude,longitude)}catch(e){$("#weatherText").textContent="取得失敗"}
-    await fetchRealSpots(latitude,longitude);
+    await testGoogleV10();
   },()=>{$("#weatherText").textContent="未取得";$("#spotStatus").textContent="現在地未取得";alert("位置情報を取得できませんでした。");},
   {enableHighAccuracy:true,timeout:10000,maximumAge:300000});
 };
 $("#getLocationBtn").onclick=useCurrentLocation;
-if(savedCoords)fetchRealSpots(+savedCoords.latitude,+savedCoords.longitude);
+if (savedCoords) {
+  testGoogleV10();
+}
 /* =========================================
    Google Places 接続テスト
 ========================================= */
