@@ -805,3 +805,250 @@ document.addEventListener(
     }
   }
 );
+// ================================================
+// v1.0 週末AI おすすめ候補テスト
+// ================================================
+async function testGoogleV10() {
+  const status = document.getElementById("spotStatus");
+  const cards = document.getElementById("realSpotCards");
+
+  let coords = null;
+
+  try {
+    coords = JSON.parse(
+      localStorage.getItem("weekend_ai_coords_v1")
+    );
+  } catch (e) {
+    console.error("保存座標の読み込みエラー", e);
+  }
+
+  // --------------------------------------------
+  // 現在地チェック
+  // --------------------------------------------
+  if (
+    !coords ||
+    !Number.isFinite(Number(coords.latitude)) ||
+    !Number.isFinite(Number(coords.longitude))
+  ) {
+    if (status) {
+      status.textContent =
+        "先に「現在地と天気を取得」を押してください";
+    }
+
+    if (cards) {
+      cards.innerHTML = `
+        <div class="spot-loading">
+          📍 現在地を取得してから検索してください。
+        </div>
+      `;
+    }
+
+    return;
+  }
+
+  const latitude = Number(coords.latitude);
+  const longitude = Number(coords.longitude);
+
+  // --------------------------------------------
+  // 検索中表示
+  // --------------------------------------------
+  if (status) {
+    status.textContent =
+      "v1.0：おすすめ候補を選定中…";
+  }
+
+  if (cards) {
+    cards.innerHTML = `
+      <div class="spot-loading">
+        ✨ 週末AIがお出かけ候補を選んでいます…<br>
+        <small>
+          100km圏のスポットからカテゴリ・距離を考慮して選定
+        </small>
+      </div>
+    `;
+  }
+
+  try {
+    // --------------------------------------------
+    // Worker v1.0
+    // --------------------------------------------
+    const apiUrl =
+      `${WEEKEND_AI_API}/spots-v10` +
+      `?lat=${encodeURIComponent(latitude)}` +
+      `&lon=${encodeURIComponent(longitude)}`;
+
+    const response = await fetch(apiUrl);
+
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      throw new Error(
+        data?.detail ||
+        data?.error ||
+        `HTTP ${response.status}`
+      );
+    }
+
+    const spots =
+      Array.isArray(data.spots)
+        ? data.spots
+        : [];
+
+    const originalCount =
+      Number(data.originalCount) || 0;
+
+    // --------------------------------------------
+    // ステータス
+    // --------------------------------------------
+    if (status) {
+      status.textContent =
+        `v1.0：${originalCount}件 → ${spots.length}件に厳選`;
+    }
+
+    if (!cards) {
+      return;
+    }
+
+    if (!spots.length) {
+      cards.innerHTML = `
+        <div class="spot-loading">
+          おすすめ候補が見つかりませんでした。
+        </div>
+      `;
+      return;
+    }
+
+    // --------------------------------------------
+    // スポット表示
+    // --------------------------------------------
+    cards.innerHTML = spots
+      .map((spot) => {
+        const distanceNumber =
+          Number(spot.distanceKm);
+
+        const distance =
+          Number.isFinite(distanceNumber)
+            ? `${distanceNumber.toFixed(1)} km`
+            : "";
+
+        const category =
+          spot.categoryLabel ||
+          spot.primaryType ||
+          "お出かけスポット";
+
+        const emoji =
+          spot.emoji || "📍";
+
+        // 距離帯
+        let distanceLabel = "";
+
+        switch (spot.distanceBand) {
+          case "near":
+            distanceLabel = "近場";
+            break;
+
+          case "middle":
+            distanceLabel = "ちょっとお出かけ";
+            break;
+
+          case "far":
+            distanceLabel = "週末ドライブ";
+            break;
+
+          case "long":
+            distanceLabel = "遠出";
+            break;
+
+          default:
+            distanceLabel = "";
+        }
+
+        return `
+          <div class="real-spot">
+
+            <div class="real-spot-icon">
+              ${escapeHtmlGoogle(emoji)}
+            </div>
+
+            <div class="real-spot-main">
+
+              <b>
+                ${escapeHtmlGoogle(
+                  spot.name || "名称不明"
+                )}
+              </b>
+
+              <small>
+                ${escapeHtmlGoogle(category)}
+                ${
+                  distanceLabel
+                    ? ` ・ ${escapeHtmlGoogle(distanceLabel)}`
+                    : ""
+                }
+                ${
+                  spot.address
+                    ? ` ・ ${escapeHtmlGoogle(spot.address)}`
+                    : ""
+                }
+              </small>
+
+            </div>
+
+            <div class="real-spot-distance">
+              ${escapeHtmlGoogle(distance)}
+            </div>
+
+          </div>
+        `;
+      })
+      .join("");
+
+  } catch (error) {
+    console.error(
+      "v1.0 おすすめ候補エラー",
+      error
+    );
+
+    if (status) {
+      status.textContent =
+        "v1.0エラー：" +
+        (error?.message || "不明なエラー");
+    }
+
+    if (cards) {
+      cards.innerHTML = `
+        <div class="spot-loading">
+          ⚠️ おすすめ候補の取得に失敗しました。<br>
+          <small>
+            ${escapeHtmlGoogle(
+              error?.message || ""
+            )}
+          </small>
+        </div>
+      `;
+    }
+  }
+}
+
+
+// ================================================
+// v1.0テストボタン
+// ================================================
+document.addEventListener(
+  "DOMContentLoaded",
+  () => {
+    const button =
+      document.getElementById(
+        "googleV10TestBtn"
+      );
+
+    if (button) {
+      button.onclick = function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        testGoogleV10();
+      };
+    }
+  }
+);
