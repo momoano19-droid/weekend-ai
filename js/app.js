@@ -402,5 +402,31 @@ async function testGooglePlaceName() {
       status.textContent =
         `直接検索エラー：${error.message}`;
     }
+   // ================================================
+// Googleテストボタン クリック動作を確実に登録
+// ================================================
+document.addEventListener("DOMContentLoaded", () => {
+  const googlePlacesBtn =
+    document.getElementById("googlePlacesTestBtn");
+
+  const googleNameBtn =
+    document.getElementById("googleNameTestBtn");
+
+  if (googlePlacesBtn) {
+    googlePlacesBtn.onclick = function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      testGooglePlaces();
+    };
+  }
+
+  if (googleNameBtn) {
+    googleNameBtn.onclick = function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      testGooglePlaceName();
+    };
+  }
+});
   }
 }
