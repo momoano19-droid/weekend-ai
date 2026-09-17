@@ -185,3 +185,148 @@ useCurrentLocation=function(){
 };
 $("#getLocationBtn").onclick=useCurrentLocation;
 if(savedCoords)fetchRealSpots(+savedCoords.latitude,+savedCoords.longitude);
+/* =========================================
+   Google Places 接続テスト
+========================================= */
+
+function addGooglePlacesTestButton() {
+  const section = document.querySelector(".real-spots");
+  if (!section) return;
+
+  if (document.getElementById("googlePlacesTestBtn")) return;
+
+  const button = document.createElement("button");
+  button.id = "googlePlacesTestBtn";
+  button.type = "button";
+  button.textContent = "🧪 Google Placesで近所をテスト";
+  button.style.cssText = `
+    width: 100%;
+    margin: 12px 0;
+    padding: 14px;
+    border: 0;
+    border-radius: 14px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+  `;
+
+  section.insertBefore(button, section.firstChild);
+
+  button.addEventListener("click", testGooglePlaces);
+}
+
+async function testGooglePlaces() {
+  const status = document.getElementById("spotStatus");
+  const cards = document.getElementById("realSpotCards");
+
+  let coords = null;
+
+  try {
+    coords = JSON.parse(
+      localStorage.getItem("weekend_ai_coords_v1")
+    );
+  } catch (e) {}
+
+  if (!coords?.latitude || !coords?.longitude) {
+    if (status) {
+      status.textContent =
+        "先に「現在地と天気を取得」を押してください";
+    }
+    return;
+  }
+
+  if (status) {
+    status.textContent = "Google Placesで検索中…";
+  }
+
+  try {
+    const url =
+      `${WEEKEND_AI_API}/google-test` +
+      `?lat=${encodeURIComponent(coords.latitude)}` +
+      `&lon=${encodeURIComponent(coords.longitude)}`;
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      throw new Error(
+        data?.detail ||
+        data?.error ||
+        "Google Places APIエラー"
+      );
+    }
+
+    const places = Array.isArray(data.places)
+      ? data.places
+      : [];
+
+    if (status) {
+      status.textContent =
+        `Google Places：${places.length}件取得`;
+    }
+
+    if (!cards) return;
+
+    if (!places.length) {
+      cards.innerHTML =
+        `<div class="empty-card">
+          Google Placesでは近所の施設が見つかりませんでした
+        </div>`;
+      return;
+    }
+
+    cards.innerHTML = places
+      .map((place) => {
+        const type =
+          place.primaryType ||
+          place.types?.[0] ||
+          "施設";
+
+        return `
+          <div class="real-spot-card">
+            <div class="real-spot-icon">📍</div>
+
+            <div class="real-spot-info">
+              <strong>${escapeHtmlGoogle(place.name)}</strong>
+
+              <small>
+                ${escapeHtmlGoogle(type)}
+                ${
+                  place.address
+                    ? `・${escapeHtmlGoogle(place.address)}`
+                    : ""
+                }
+              </small>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+  } catch (error) {
+    console.error(error);
+
+    if (status) {
+      status.textContent =
+        "Google Places接続エラー：" +
+        (error?.message || "不明なエラー");
+    }
+  }
+}
+
+function escapeHtmlGoogle(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener(
+    "DOMContentLoaded",
+    addGooglePlacesTestButton
+  );
+} else {
+  addGooglePlacesTestButton();
+}
