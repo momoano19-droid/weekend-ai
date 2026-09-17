@@ -590,3 +590,218 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 });
+// ================================================
+// v0.9 Google Places 100km検索テスト
+// ================================================
+async function testGoogleV09() {
+  const status = document.getElementById("spotStatus");
+  const cards = document.getElementById("realSpotCards");
+
+  let coords = null;
+
+  try {
+    coords = JSON.parse(
+      localStorage.getItem("weekend_ai_coords_v1")
+    );
+  } catch (e) {
+    console.error("保存座標の読み込みエラー", e);
+  }
+
+  // 現在地がまだ保存されていない場合
+  if (
+    !coords ||
+    !Number.isFinite(Number(coords.latitude)) ||
+    !Number.isFinite(Number(coords.longitude))
+  ) {
+    if (status) {
+      status.textContent =
+        "先に「現在地と天気を取得」を押してください";
+    }
+
+    if (cards) {
+      cards.innerHTML = `
+        <div class="spot-loading">
+          📍 現在地を取得してから検索してください。
+        </div>
+      `;
+    }
+
+    return;
+  }
+
+  const latitude = Number(coords.latitude);
+  const longitude = Number(coords.longitude);
+
+  if (status) {
+    status.textContent =
+      "v0.9：100km圏を検索中…";
+  }
+
+  if (cards) {
+    cards.innerHTML = `
+      <div class="spot-loading">
+        🔎 Google Placesから100km圏を検索しています…<br>
+        <small>
+          公園・美術館/博物館・動物園/水族館・遊園地・観光/体験
+        </small>
+      </div>
+    `;
+  }
+
+  try {
+    const apiUrl =
+      `${WEEKEND_AI_API}/spots-v09` +
+      `?lat=${encodeURIComponent(latitude)}` +
+      `&lon=${encodeURIComponent(longitude)}`;
+
+    const response = await fetch(apiUrl);
+
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      throw new Error(
+        data?.detail ||
+        data?.error ||
+        `HTTP ${response.status}`
+      );
+    }
+
+    const spots =
+      Array.isArray(data.spots)
+        ? data.spots
+        : [];
+
+    // --------------------------------------------
+    // ステータス表示
+    // --------------------------------------------
+
+    if (status) {
+      status.textContent =
+        `v0.9：100km圏 ${spots.length}件取得`;
+    }
+
+    if (!cards) {
+      return;
+    }
+
+    if (!spots.length) {
+      cards.innerHTML = `
+        <div class="spot-loading">
+          100km圏の候補が見つかりませんでした。
+        </div>
+      `;
+
+      return;
+    }
+
+    // --------------------------------------------
+    // スポット表示
+    // --------------------------------------------
+
+    cards.innerHTML = spots
+      .map((spot) => {
+
+        const distanceNumber =
+          Number(spot.distanceKm);
+
+        const distance =
+          Number.isFinite(distanceNumber)
+            ? `${distanceNumber.toFixed(1)} km`
+            : "";
+
+        const category =
+          spot.categoryLabel ||
+          spot.primaryType ||
+          "お出かけスポット";
+
+        const emoji =
+          spot.emoji ||
+          "📍";
+
+        return `
+          <div class="real-spot">
+
+            <div class="real-spot-icon">
+              ${escapeHtmlGoogle(emoji)}
+            </div>
+
+            <div class="real-spot-main">
+
+              <b>
+                ${escapeHtmlGoogle(
+                  spot.name || "名称不明"
+                )}
+              </b>
+
+              <small>
+                ${escapeHtmlGoogle(category)}
+                ${
+                  spot.address
+                    ? ` ・ ${escapeHtmlGoogle(spot.address)}`
+                    : ""
+                }
+              </small>
+
+            </div>
+
+            <div class="real-spot-distance">
+              ${escapeHtmlGoogle(distance)}
+            </div>
+
+          </div>
+        `;
+      })
+      .join("");
+
+  } catch (error) {
+
+    console.error(
+      "v0.9 100km検索エラー",
+      error
+    );
+
+    if (status) {
+      status.textContent =
+        "v0.9検索エラー：" +
+        (error?.message || "不明なエラー");
+    }
+
+    if (cards) {
+      cards.innerHTML = `
+        <div class="spot-loading">
+          ⚠️ 100km検索に失敗しました。<br>
+          <small>
+            ${escapeHtmlGoogle(
+              error?.message || ""
+            )}
+          </small>
+        </div>
+      `;
+    }
+  }
+}
+
+
+// ================================================
+// v0.9ボタンのクリック処理
+// ================================================
+document.addEventListener(
+  "DOMContentLoaded",
+  () => {
+
+    const button =
+      document.getElementById(
+        "googleV09TestBtn"
+      );
+
+    if (button) {
+      button.onclick = function (event) {
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        testGoogleV09();
+      };
+    }
+  }
+);
