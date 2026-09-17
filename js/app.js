@@ -65,6 +65,7 @@ apply(JSON.parse(localStorage.getItem(KEY.defaults)||"null")); let prof=JSON.par
 renderPlans();updateSaving();go("home");
 
 // ===== v0.3 現在地 + 実天気 =====
+let currentPosition = null;
 function weatherInfo(code){
   if(code===0)return ["☀️","快晴"];
   if([1,2].includes(code))return ["🌤️","晴れ"];
@@ -95,6 +96,10 @@ async function useCurrentLocation(){
   navigator.geolocation.getCurrentPosition(async pos=>{
     try{
       const { latitude, longitude, accuracy } = pos.coords;
+     currentPosition = {
+  lat: latitude,
+  lon: longitude
+};
 
 console.log("===== 週末AI 現在地確認 =====");
 console.log("緯度:", latitude);
@@ -1120,7 +1125,7 @@ async function generateDayPlanV14(mainSpot){
       ...latestWeekendCandidates.filter(x=>x?.id&&x.id!==mainSpot?.id)
     ].filter((x,i,a)=>x?.id&&a.findIndex(y=>y?.id===x.id)===i).slice(0,30);
 
-    const response=await fetch(`${WEEKEND_AI_API}/day-plan-v14`,{
+    const response = await fetch(`${WEEKEND_AI_API}/day-plan-v16`, {
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
