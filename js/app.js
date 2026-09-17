@@ -190,7 +190,7 @@ if(savedCoords)fetchRealSpots(+savedCoords.latitude,+savedCoords.longitude);
 ========================================= */
 
 function addGooglePlacesTestButton() {
-  const section = document.querySelector(".real-spots");
+  const section = document.querySelector(".nearby-section");
   if (!section) return;
 
   if (document.getElementById("googlePlacesTestBtn")) return;
