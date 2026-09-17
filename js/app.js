@@ -940,6 +940,22 @@ async function testGoogleV10() {
 
         const emoji =
           spot.emoji || "📍";
+       // Google評価・口コミ数
+const ratingNumber =
+  Number(spot.rating);
+
+const rating =
+  Number.isFinite(ratingNumber) && ratingNumber > 0
+    ? ratingNumber.toFixed(1)
+    : "";
+
+const reviewCount =
+  Number(spot.userRatingCount);
+
+const reviews =
+  Number.isFinite(reviewCount) && reviewCount > 0
+    ? reviewCount.toLocaleString("ja-JP")
+    : "";
 
         // 距離帯
         let distanceLabel = "";
@@ -979,6 +995,21 @@ async function testGoogleV10() {
                   spot.name || "名称不明"
                 )}
               </b>
+              
+${
+  rating
+    ? `
+      <div class="real-spot-rating">
+        ⭐ ${escapeHtmlGoogle(rating)}
+        ${
+          reviews
+            ? ` ・ 口コミ ${escapeHtmlGoogle(reviews)}件`
+            : ""
+        }
+      </div>
+    `
+    : ""
+}
 
               <small>
                 ${escapeHtmlGoogle(category)}
