@@ -330,3 +330,77 @@ if (document.readyState === "loading") {
 } else {
   addGooglePlacesTestButton();
 }
+// ================================================
+// Google Places 施設名直接検索テスト
+// ================================================
+async function testGooglePlaceName() {
+  const status = document.getElementById("spotStatus");
+  const cards = document.getElementById("realSpotCards");
+
+  if (status) {
+    status.textContent = "八色の森公園をGoogle Placesで検索中...";
+  }
+
+  try {
+    const response = await fetch(
+      `${WEEKEND_AI_API}/google-name-test`
+    );
+
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      throw new Error(
+        data.error || "Google Placesの検索に失敗しました"
+      );
+    }
+
+    const places = Array.isArray(data.places)
+      ? data.places
+      : [];
+
+    if (status) {
+      status.textContent =
+        `「八色の森公園」直接検索：${places.length}件取得`;
+    }
+
+    if (!cards) return;
+
+    if (places.length === 0) {
+      cards.innerHTML = `
+        <div class="real-spot-card">
+          <strong>八色の森公園は見つかりませんでした</strong>
+          <div class="real-spot-meta">
+            Google Placesの施設名検索でも候補がありませんでした。
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    cards.innerHTML = places
+      .map((place) => {
+        return `
+          <div class="real-spot-card">
+            <strong>${escapeHtmlGoogle(place.name || "名称不明")}</strong>
+
+            <div class="real-spot-meta">
+              ${escapeHtmlGoogle(place.address || "")}
+            </div>
+
+            <div class="real-spot-meta">
+              種類：${escapeHtmlGoogle(place.primaryType || "不明")}
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+
+  } catch (error) {
+    console.error(error);
+
+    if (status) {
+      status.textContent =
+        `直接検索エラー：${error.message}`;
+    }
+  }
+}
