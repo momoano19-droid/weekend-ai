@@ -1,6 +1,8 @@
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const KEY={defaults:"weekend_ai_defaults_v1",saved:"weekend_ai_saved_v1",history:"weekend_ai_history_v1",profile:"weekend_ai_profile_v1",saving:"weekend_ai_saving_v1"};
 let selectedPlan=null;
+let latestWeekendCandidates=[];
+let latestAIPlans=[];
 
 const templates=[
  {tag:"今日のイチオシ",title:"水族館＋海辺ランチ",emoji:"🐟",cost:4850,saving:1450,travel:45,highway:0,return:"16:50",stops:["自宅を出発","水族館でゆっくり","子連れOKの海辺ランチ","公園でひと休み","帰宅"]},
@@ -51,11 +53,11 @@ function packingItems(){
  if(!c.indoor)items.push("帽子・日焼け/防寒対策"); if(c.supermarket)items.push("買い物バッグ"); return items;
 }
 function renderPacking(){let items=packingItems(); $("#packingList").innerHTML=items.map((x,i)=>`<label class="packing-item"><input type="checkbox" class="pack"> ${x}</label>`).join(""); let upd=()=>{$("#packingProgress").textContent=`準備 ${$$(".pack:checked").length} / ${items.length}`}; $$(".pack").forEach(x=>x.onchange=upd);upd()}
-$("#conditionForm").onsubmit=e=>{e.preventDefault();renderPlans();go("home")};
+$("#conditionForm").onsubmit=async e=>{e.preventDefault();go("home");await generateAIPlansV12();};
 $("#saveDefault").onclick=()=>{localStorage.setItem(KEY.defaults,JSON.stringify(data()));alert("いつもの条件として保存しました。")};
 $("#loadDefault").onclick=()=>apply(JSON.parse(localStorage.getItem(KEY.defaults)||"null"));
-$("#quickPlan").onclick=()=>{let d=JSON.parse(localStorage.getItem(KEY.defaults)||"null");if(d)apply(d);renderPlans();};
-$("#nowPlan").onclick=()=>{let d=data();d.startPlace="現在地";apply(d);renderPlans();alert("MVP版では現在地を仮設定しました。次の段階でスマホの位置情報を接続します。")};
+$("#quickPlan").onclick=async()=>{let d=JSON.parse(localStorage.getItem(KEY.defaults)||"null");if(d)apply(d);await generateAIPlansV12();};
+$("#nowPlan").onclick=async()=>{let d=data();d.startPlace="現在地";apply(d);await generateAIPlansV12();};
 $("#saveProfile").onclick=()=>{let p={family:$("#family").value,milkInterval:$("#milkInterval").value,milkAmount:$("#milkAmount").value,napTime:$("#napTime").value};localStorage.setItem(KEY.profile,JSON.stringify(p));alert("プロフィールを保存しました。")};
 $("#profileBtn").onclick=()=>go("mypage");
 function updateSaving(){$("#monthlySaving").textContent="¥"+(+localStorage.getItem(KEY.saving)||0).toLocaleString()}
@@ -87,50 +89,245 @@ async function geocodePlace(name){
   if(!j.results?.length)throw new Error("notfound");
   const x=j.results[0]; setPlaceLabel([x.name,x.admin1].filter(Boolean).join("・")); await loadWeather(x.latitude,x.longitude);
 }
-
 async function useCurrentLocation(){
-  if(!navigator.geolocation){
-    alert("このブラウザは位置情報に対応していません。場所入力を使ってください。");
+  if(!navigator.geolocation){alert("このブラウザは位置情報に対応していません。場所入力を使ってください。");return}
+  $("#weatherText").textContent="取得中…";
+  navigator.geolocation.getCurrentPosition(async pos=>{
+    try{
+      const { latitude, longitude, accuracy } = pos.coords;
+
+console.log("===== 週末AI 現在地確認 =====");
+console.log("緯度:", latitude);
+console.log("経度:", longitude);
+console.log("位置情報の精度:", accuracy, "m");
+
+alert(
+  "週末AIが取得した位置情報\n\n" +
+  "緯度：" + latitude.toFixed(6) + "\n" +
+  "経度：" + longitude.toFixed(6) + "\n" +
+  "精度：±" + Math.round(accuracy) + "m"
+);
+      setPlaceLabel("現在地");
+      localStorage.setItem("weekend_ai_coords_v1",JSON.stringify({latitude,longitude}));
+      await loadWeather(latitude,longitude);
+    }catch(e){$("#weatherText").textContent="取得失敗";alert("天気を取得できませんでした。")}
+  },err=>{
+    $("#weatherText").textContent="未取得";
+    alert("位置情報を取得できませんでした。ブラウザの位置情報許可を確認するか、「場所を入力」を使ってください。");
+  },{enableHighAccuracy:true,timeout:10000,maximumAge:300000});
+}
+$("#getLocationBtn").onclick=useCurrentLocation;
+$("#manualLocationBtn").onclick=async()=>{
+  const name=prompt("市区町村や地名を入力してください（例：南魚沼市、新潟市）");
+  if(!name)return;
+  $("#weatherText").textContent="検索中…";
+  try{await geocodePlace(name)}catch(e){$("#weatherText").textContent="未取得";alert("場所が見つかりませんでした。別の地名で試してください。")}
+};
+const savedCoords=JSON.parse(localStorage.getItem("weekend_ai_coords_v1")||"null");
+if(savedCoords) loadWeather(savedCoords.latitude,savedCoords.longitude).catch(()=>{});
+
+// ===== v0.6 Yahoo! JAPAN / Cloudflare Worker 実在スポット候補 =====
+const WEEKEND_AI_API="https://weekend-ai-api.momo-ano19.workers.dev";
+
+function kmBetween(a,b,c,d){
+  const R=6371,rad=x=>x*Math.PI/180,dLat=rad(c-a),dLon=rad(d-b);
+  const h=Math.sin(dLat/2)**2+Math.cos(rad(a))*Math.cos(rad(c))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+function escapeHtml(s=""){
+  return String(s).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+}
+function yahooSpotKind(x={}){
+  const t=((x.genres||[]).join(" ")+" "+(x.name||""));
+  if(/水族館/.test(t))return ["🐠","水族館"];
+  if(/動物園/.test(t))return ["🦁","動物園"];
+  if(/博物館|資料館|美術館|ミュージアム/.test(t))return ["🏛️","博物館・美術館"];
+  if(/遊園地|テーマパーク/.test(t))return ["🎡","テーマパーク"];
+  if(/公園|パーク/.test(t))return ["🌳","公園"];
+  if(/道の駅/.test(t))return ["🚗","道の駅"];
+  return ["📍",(x.genres||[])[0]||"お出かけスポット"];
+}
+function renderRealSpots(spots,lat,lon){
+  const box=$("#realSpotCards");
+  if(!spots.length){
+    box.innerHTML='<div class="spot-loading">周辺の登録スポットが見つかりませんでした。</div>';
     return;
   }
-  $("#weatherText").textContent="取得中…";
-  $("#spotStatus").textContent="現在地取得中…";
+  box.innerHTML=spots.slice(0,12).map(x=>{
+    const k=yahooSpotKind(x);
+    const dist=Number.isFinite(+x.lat)&&Number.isFinite(+x.lon)?kmBetween(lat,lon,+x.lat,+x.lon):null;
+    const sub=[k[1],x.address].filter(Boolean).map(escapeHtml).join(" ・ ");
+    return `<div class="real-spot"><div class="real-spot-icon">${k[0]}</div><div class="real-spot-main"><b>${escapeHtml(x.name||"名称不明")}</b><small>${sub}</small></div><div class="real-spot-distance">${dist!=null?dist.toFixed(1)+" km":""}</div></div>`;
+  }).join("");
+}
+async function fetchRealSpots(lat,lon){
+  const status=$("#spotStatus"),box=$("#realSpotCards");
+  status.textContent="Yahoo!で検索中…";
+  box.innerHTML='<div class="spot-loading">🔎 現在地周辺の実在スポットを探しています…<br><small>週末AI API → Yahoo! JAPAN</small></div>';
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);
+  try{
+    const r=await fetch(`${WEEKEND_AI_API}/spots?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`,{signal:controller.signal});
+    const j=await r.json().catch(()=>null);
+    clearTimeout(timer);
+    if(!r.ok||!j?.ok)throw new Error(j?.error||`HTTP ${r.status}`);
+    const spots=Array.isArray(j.spots)?j.spots:[];
+    status.textContent=`Yahoo! ${spots.length}件取得`;
+    renderRealSpots(spots,lat,lon);
+  }catch(e){
+    clearTimeout(timer);
+    const msg=e.name==="AbortError"?"検索がタイムアウトしました":e.message;
+    status.textContent="施設検索エラー";
+    box.innerHTML=`<div class="spot-loading">⚠️ 実在スポットを取得できませんでした。<br><small>${escapeHtml(msg)}</small><br><button class="retry-spots" onclick="searchRealSpotsFromSavedLocation()">もう一度検索</button></div>`;
+  }
+}
+async function searchRealSpotsFromSavedLocation(){
+  const c=JSON.parse(localStorage.getItem("weekend_ai_coords_v1")||"null");
+  if(!c){$("#spotStatus").textContent="先に現在地を取得してください";return}
+  await fetchRealSpots(+c.latitude,+c.longitude);
+}
+useCurrentLocation=function(){
+  if(!navigator.geolocation){alert("このブラウザは位置情報に対応していません。");return}
+  $("#weatherText").textContent="取得中…";$("#spotStatus").textContent="現在地取得中…";
   navigator.geolocation.getCurrentPosition(async pos=>{
     const {latitude,longitude}=pos.coords;
     setPlaceLabel("現在地");
     localStorage.setItem("weekend_ai_coords_v1",JSON.stringify({latitude,longitude}));
     try{await loadWeather(latitude,longitude)}catch(e){$("#weatherText").textContent="取得失敗"}
     await testGoogleV10();
-  },()=>{
-    $("#weatherText").textContent="未取得";
-    $("#spotStatus").textContent="現在地未取得";
-    alert("位置情報を取得できませんでした。ブラウザの位置情報許可を確認するか、「場所を入力」を使ってください。");
-  },{enableHighAccuracy:true,timeout:10000,maximumAge:300000});
+  },()=>{$("#weatherText").textContent="未取得";$("#spotStatus").textContent="現在地未取得";alert("位置情報を取得できませんでした。");},
+  {enableHighAccuracy:true,timeout:10000,maximumAge:300000});
+};
+$("#getLocationBtn").onclick=useCurrentLocation;
+if (savedCoords) {
+  testGoogleV10();
+}
+/* =========================================
+   Google Places 接続テスト
+========================================= */
+
+function addGooglePlacesTestButton() {
+  const section = document.querySelector(".nearby-section");
+  if (!section) return;
+
+  if (document.getElementById("googlePlacesTestBtn")) return;
+
+  const button = document.createElement("button");
+  button.id = "googlePlacesTestBtn";
+  button.type = "button";
+  button.textContent = "🧪 Google Placesで近所をテスト";
+  button.style.cssText = `
+    width: 100%;
+    margin: 12px 0;
+    padding: 14px;
+    border: 0;
+    border-radius: 14px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+  `;
+
+  section.insertBefore(button, section.firstChild);
+
+  button.addEventListener("click", testGooglePlaces);
 }
 
-$("#getLocationBtn").onclick=useCurrentLocation;
-$("#manualLocationBtn").onclick=async()=>{
-  const name=prompt("市区町村や地名を入力してください（例：南魚沼市、新潟市）");
-  if(!name)return;
-  $("#weatherText").textContent="検索中…";
-  try{
-    const u=`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=ja&countryCode=JP&format=json`;
-    const r=await fetch(u);
-    if(!r.ok)throw new Error("geocode");
-    const j=await r.json();
-    if(!j.results?.length)throw new Error("notfound");
-    const x=j.results[0];
-    setPlaceLabel([x.name,x.admin1].filter(Boolean).join("・"));
-    localStorage.setItem("weekend_ai_coords_v1",JSON.stringify({latitude:x.latitude,longitude:x.longitude}));
-    await loadWeather(x.latitude,x.longitude);
-    await testGoogleV10();
-  }catch(e){
-    $("#weatherText").textContent="未取得";
-    alert("場所が見つかりませんでした。別の地名で試してください。");
-  }
-};
+async function testGooglePlaces() {
+  const status = document.getElementById("spotStatus");
+  const cards = document.getElementById("realSpotCards");
 
-const WEEKEND_AI_API="https://weekend-ai-api.momo-ano19.workers.dev";
+  let coords = null;
+
+  try {
+    coords = JSON.parse(
+      localStorage.getItem("weekend_ai_coords_v1")
+    );
+  } catch (e) {}
+
+  if (!coords?.latitude || !coords?.longitude) {
+    if (status) {
+      status.textContent =
+        "先に「現在地と天気を取得」を押してください";
+    }
+    return;
+  }
+
+  if (status) {
+    status.textContent = "Google Placesで検索中…";
+  }
+
+  try {
+    const url =
+      `${WEEKEND_AI_API}/google-test` +
+      `?lat=${encodeURIComponent(coords.latitude)}` +
+      `&lon=${encodeURIComponent(coords.longitude)}`;
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      throw new Error(
+        data?.detail ||
+        data?.error ||
+        "Google Places APIエラー"
+      );
+    }
+
+    const places = Array.isArray(data.places)
+      ? data.places
+      : [];
+
+    if (status) {
+      status.textContent =
+        `Google Places：${places.length}件取得`;
+    }
+
+    if (!cards) return;
+
+    if (!places.length) {
+      cards.innerHTML =
+        `<div class="empty-card">
+          Google Placesでは近所の施設が見つかりませんでした
+        </div>`;
+      return;
+    }
+
+    cards.innerHTML = places
+      .map((place) => {
+        const type =
+          place.primaryType ||
+          place.types?.[0] ||
+          "施設";
+
+        return `
+          <div class="real-spot-card">
+            <div class="real-spot-icon">📍</div>
+
+            <div class="real-spot-info">
+              <strong>${escapeHtmlGoogle(place.name)}</strong>
+
+              <small>
+                ${escapeHtmlGoogle(type)}
+                ${
+                  place.address
+                    ? `・${escapeHtmlGoogle(place.address)}`
+                    : ""
+                }
+              </small>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+  } catch (error) {
+    console.error(error);
+
+    if (status) {
+      status.textContent =
+        "Google Places接続エラー：" +
+        (error?.message || "不明なエラー");
+    }
+  }
+}
 
 function escapeHtmlGoogle(value) {
   return String(value ?? "")
@@ -141,15 +338,647 @@ function escapeHtmlGoogle(value) {
     .replaceAll("'", "&#039;");
 }
 
-const savedCoords=JSON.parse(localStorage.getItem("weekend_ai_coords_v1")||"null");
-if(savedCoords){
-  loadWeather(savedCoords.latitude,savedCoords.longitude).catch(()=>{});
-  setTimeout(()=>testGoogleV10(),0);
+if (document.readyState === "loading") {
+  document.addEventListener(
+    "DOMContentLoaded",
+    addGooglePlacesTestButton
+  );
+} else {
+  addGooglePlacesTestButton();
+}
+// ================================================
+// Google Places 施設名直接検索テスト
+// ================================================
+async function testGooglePlaceName() {
+  const status = document.getElementById("spotStatus");
+  const cards = document.getElementById("realSpotCards");
+
+  if (status) {
+    status.textContent = "八色の森公園をGoogle Placesで検索中...";
+  }
+
+  try {
+    const response = await fetch(
+      `${WEEKEND_AI_API}/google-name-test`
+    );
+
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      throw new Error(
+        data.error || "Google Placesの検索に失敗しました"
+      );
+    }
+
+    const places = Array.isArray(data.places)
+      ? data.places
+      : [];
+
+    if (status) {
+      status.textContent =
+        `「八色の森公園」直接検索：${places.length}件取得`;
+    }
+
+    if (!cards) return;
+
+    if (places.length === 0) {
+      cards.innerHTML = `
+        <div class="real-spot-card">
+          <strong>八色の森公園は見つかりませんでした</strong>
+          <div class="real-spot-meta">
+            Google Placesの施設名検索でも候補がありませんでした。
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    cards.innerHTML = places
+      .map((place) => {
+        return `
+          <div class="real-spot-card">
+            <strong>${escapeHtmlGoogle(place.name || "名称不明")}</strong>
+
+            <div class="real-spot-meta">
+              ${escapeHtmlGoogle(place.address || "")}
+            </div>
+
+            <div class="real-spot-meta">
+              種類：${escapeHtmlGoogle(place.primaryType || "不明")}
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+
+  } catch (error) {
+    console.error(error);
+
+    if (status) {
+      status.textContent =
+        `直接検索エラー：${error.message}`;
+    }
+   // ================================================
+// Googleテストボタン クリック動作を確実に登録
+// ================================================
+document.addEventListener("DOMContentLoaded", () => {
+  const googlePlacesBtn =
+    document.getElementById("googlePlacesTestBtn");
+
+  const googleNameBtn =
+    document.getElementById("googleNameTestBtn");
+
+  if (googlePlacesBtn) {
+    googlePlacesBtn.onclick = function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      testGooglePlaces();
+    };
+  }
+
+  if (googleNameBtn) {
+    googleNameBtn.onclick = function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      testGooglePlaceName();
+    };
+  }
+});
+  }
+}
+// ================================================
+// v0.8 Google Places 50km検索テスト
+// ================================================
+async function testGoogleV08() {
+  const status = document.getElementById("spotStatus");
+  const cards = document.getElementById("realSpotCards");
+
+  let coords = null;
+
+  try {
+    coords = JSON.parse(
+      localStorage.getItem("weekend_ai_coords_v1")
+    );
+  } catch (e) {}
+
+  if (!coords?.latitude || !coords?.longitude) {
+    if (status) {
+      status.textContent =
+        "先に「現在地と天気を取得」を押してください";
+    }
+    return;
+  }
+alert(
+  "v0.8検索で使用する保存座標\n\n" +
+  "緯度：" + Number(coords.latitude).toFixed(6) + "\n" +
+  "経度：" + Number(coords.longitude).toFixed(6)
+);
+  if (status) {
+    status.textContent = "v0.8：50km圏をカテゴリ別に検索中…";
+  }
+
+  if (cards) {
+    cards.innerHTML = `
+      <div class="spot-loading">
+        🔎 Google Placesから50km圏を検索しています…<br>
+        <small>公園・美術館/博物館・動物園/水族館・遊園地・観光/体験</small>
+      </div>
+    `;
+  }
+
+  try {
+    const url =
+      `${WEEKEND_AI_API}/spots-v08` +
+      `?lat=${encodeURIComponent(coords.latitude)}` +
+      `&lon=${encodeURIComponent(coords.longitude)}`;
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      throw new Error(
+        data?.detail ||
+        data?.error ||
+        "v0.8の検索に失敗しました"
+      );
+    }
+
+    const spots = Array.isArray(data.spots)
+      ? data.spots
+      : [];
+
+    if (status) {
+      status.textContent =
+        `v0.8：50km圏 ${spots.length}件取得`;
+    }
+
+    if (!cards) return;
+
+    if (!spots.length) {
+      cards.innerHTML = `
+        <div class="spot-loading">
+          50km圏のスポットが見つかりませんでした。
+        </div>
+      `;
+      return;
+    }
+
+    cards.innerHTML = spots
+      .map((spot) => {
+        const distance =
+          Number.isFinite(Number(spot.distanceKm))
+            ? `${Number(spot.distanceKm).toFixed(1)} km`
+            : "";
+
+        return `
+          <div class="real-spot">
+            <div class="real-spot-icon">
+              ${escapeHtmlGoogle(spot.emoji || "📍")}
+            </div>
+
+            <div class="real-spot-main">
+              <b>${escapeHtmlGoogle(spot.name || "名称不明")}</b>
+
+              <small>
+                ${escapeHtmlGoogle(
+                  spot.categoryLabel ||
+                  spot.primaryType ||
+                  "お出かけスポット"
+                )}
+                ${
+                  spot.address
+                    ? ` ・ ${escapeHtmlGoogle(spot.address)}`
+                    : ""
+                }
+              </small>
+            </div>
+
+            <div class="real-spot-distance">
+              ${escapeHtmlGoogle(distance)}
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+
+  } catch (error) {
+    console.error(error);
+
+    if (status) {
+      status.textContent =
+        "v0.8検索エラー：" +
+        (error?.message || "不明なエラー");
+    }
+
+    if (cards) {
+      cards.innerHTML = `
+        <div class="spot-loading">
+          ⚠️ v0.8の検索に失敗しました。<br>
+          <small>${escapeHtmlGoogle(error?.message || "")}</small>
+        </div>
+      `;
+    }
+  }
 }
 
+// v0.8ボタンにクリック処理を登録
+document.addEventListener("DOMContentLoaded", () => {
+  const button =
+    document.getElementById("googleV08TestBtn");
+
+  if (button) {
+    button.onclick = function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      testGoogleV08();
+    };
+  }
+});
 // ================================================
-// v1.1 週末AI おすすめ候補
+// v0.9 Google Places 100km検索テスト
 // ================================================
+async function testGoogleV09() {
+  const status = document.getElementById("spotStatus");
+  const cards = document.getElementById("realSpotCards");
+
+  let coords = null;
+
+  try {
+    coords = JSON.parse(
+      localStorage.getItem("weekend_ai_coords_v1")
+    );
+  } catch (e) {
+    console.error("保存座標の読み込みエラー", e);
+  }
+
+  // 現在地がまだ保存されていない場合
+  if (
+    !coords ||
+    !Number.isFinite(Number(coords.latitude)) ||
+    !Number.isFinite(Number(coords.longitude))
+  ) {
+    if (status) {
+      status.textContent =
+        "先に「現在地と天気を取得」を押してください";
+    }
+
+    if (cards) {
+      cards.innerHTML = `
+        <div class="spot-loading">
+          📍 現在地を取得してから検索してください。
+        </div>
+      `;
+    }
+
+    return;
+  }
+
+  const latitude = Number(coords.latitude);
+  const longitude = Number(coords.longitude);
+
+  if (status) {
+    status.textContent =
+      "v0.9：100km圏を検索中…";
+  }
+
+  if (cards) {
+    cards.innerHTML = `
+      <div class="spot-loading">
+        🔎 Google Placesから100km圏を検索しています…<br>
+        <small>
+          公園・美術館/博物館・動物園/水族館・遊園地・観光/体験
+        </small>
+      </div>
+    `;
+  }
+
+  try {
+    const apiUrl =
+      `${WEEKEND_AI_API}/spots-v09` +
+      `?lat=${encodeURIComponent(latitude)}` +
+      `&lon=${encodeURIComponent(longitude)}`;
+
+    const response = await fetch(apiUrl);
+
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      throw new Error(
+        data?.detail ||
+        data?.error ||
+        `HTTP ${response.status}`
+      );
+    }
+
+    const spots =
+      Array.isArray(data.spots)
+        ? data.spots
+        : [];
+
+    // --------------------------------------------
+    // ステータス表示
+    // --------------------------------------------
+
+    if (status) {
+      status.textContent =
+        `v0.9：100km圏 ${spots.length}件取得`;
+    }
+
+    if (!cards) {
+      return;
+    }
+
+    if (!spots.length) {
+      cards.innerHTML = `
+        <div class="spot-loading">
+          100km圏の候補が見つかりませんでした。
+        </div>
+      `;
+
+      return;
+    }
+
+    // --------------------------------------------
+    // スポット表示
+    // --------------------------------------------
+
+    cards.innerHTML = spots
+      .map((spot) => {
+
+        const distanceNumber =
+          Number(spot.distanceKm);
+
+        const distance =
+          Number.isFinite(distanceNumber)
+            ? `${distanceNumber.toFixed(1)} km`
+            : "";
+
+        const category =
+          spot.categoryLabel ||
+          spot.primaryType ||
+          "お出かけスポット";
+
+        const emoji =
+          spot.emoji ||
+          "📍";
+
+        return `
+          <div class="real-spot">
+
+            <div class="real-spot-icon">
+              ${escapeHtmlGoogle(emoji)}
+            </div>
+
+            <div class="real-spot-main">
+
+              <b>
+                ${escapeHtmlGoogle(
+                  spot.name || "名称不明"
+                )}
+              </b>
+
+              <small>
+                ${escapeHtmlGoogle(category)}
+                ${
+                  spot.address
+                    ? ` ・ ${escapeHtmlGoogle(spot.address)}`
+                    : ""
+                }
+              </small>
+
+            </div>
+
+            <div class="real-spot-distance">
+              ${escapeHtmlGoogle(distance)}
+            </div>
+
+          </div>
+        `;
+      })
+      .join("");
+
+  } catch (error) {
+
+    console.error(
+      "v0.9 100km検索エラー",
+      error
+    );
+
+    if (status) {
+      status.textContent =
+        "v0.9検索エラー：" +
+        (error?.message || "不明なエラー");
+    }
+
+    if (cards) {
+      cards.innerHTML = `
+        <div class="spot-loading">
+          ⚠️ 100km検索に失敗しました。<br>
+          <small>
+            ${escapeHtmlGoogle(
+              error?.message || ""
+            )}
+          </small>
+        </div>
+      `;
+    }
+  }
+}
+
+
+// ================================================
+// v0.9ボタンのクリック処理
+// ================================================
+document.addEventListener(
+  "DOMContentLoaded",
+  () => {
+
+    const button =
+      document.getElementById(
+        "googleV09TestBtn"
+      );
+
+    if (button) {
+      button.onclick = function (event) {
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        testGoogleV09();
+      };
+    }
+  }
+);
+// ================================================
+// v1.0 週末AI おすすめ候補テスト
+// ================================================
+
+// ================================================
+// v1.2 実在スポット30件 → OpenAI 3プラン生成
+// ================================================
+function buildAIConditions(){
+  const c=data();
+  let durationHours=null;
+  try{
+    const [sh,sm]=String(c.startTime||"").split(":").map(Number);
+    const [eh,em]=String(c.endTime||"").split(":").map(Number);
+    const start=sh+sm/60,end=eh+em/60;
+    if(Number.isFinite(start)&&Number.isFinite(end)){
+      durationHours=Math.max(1,end-start);
+    }
+  }catch(e){}
+
+  return {
+    outingMode:"standard",
+    durationHours,
+    budgetYen:Number.isFinite(Number(c.budget))?Number(c.budget):null,
+    childAgeText:String(c.childAge||""),
+    indoorOutdoor:c.indoor?"屋内優先":"どちらでも",
+    note:[
+      c.highway?"高速道路OK":"高速道路は使わない",
+      c.lunch?"ランチあり":"ランチなし",
+      c.supermarket?"帰りにスーパー希望":""
+    ].filter(Boolean).join("・")
+  };
+}
+
+function aiPlanEmoji(type,spot={}){
+  if(type==="best") return "✨";
+  if(type==="value") return "💰";
+  if(type==="child") return "👶";
+  return spot.emoji||"📍";
+}
+
+function renderAIPlans(plans){
+  latestAIPlans=Array.isArray(plans)?plans:[];
+  const box=$("#planCards");
+  if(!box)return;
+
+  box.innerHTML=latestAIPlans.map((p,i)=>{
+    const s=p.spot||{};
+    const d=Number(s.distanceKm);
+    const distance=Number.isFinite(d)?`${d.toFixed(1)} km`:"距離情報なし";
+    const r=Number(s.rating);
+    const rating=Number.isFinite(r)&&r>0?`⭐ ${r.toFixed(1)}`:"";
+    const reviews=Number(s.userRatingCount);
+    const reviewText=Number.isFinite(reviews)&&reviews>0?`口コミ ${reviews.toLocaleString("ja-JP")}件`:"";
+    const meta=[distance,rating,reviewText].filter(Boolean);
+
+    return `<article class="plan-card">
+      <div class="plan-photo">${aiPlanEmoji(p.type,s)}</div>
+      <div class="plan-body">
+        <div class="plan-title">
+          <b>${escapeHtmlGoogle(p.spotName||s.name||"名称不明")}</b>
+          <span class="badge">${escapeHtmlGoogle(p.title||"AIプラン")}</span>
+        </div>
+        <div class="meta">${meta.map(x=>`<span>${escapeHtmlGoogle(x)}</span>`).join("")}</div>
+        <p style="margin:10px 0;line-height:1.6;">${escapeHtmlGoogle(p.reason||"")}</p>
+        <button class="primary openAIPlan" data-i="${i}">詳しく見る</button>
+      </div>
+    </article>`;
+  }).join("");
+
+  $$(".openAIPlan").forEach(b=>{
+    b.onclick=()=>openAIPlan(latestAIPlans[+b.dataset.i]);
+  });
+}
+
+function openAIPlan(p){
+  selectedPlan=p;
+  const s=p.spot||{};
+  const d=Number(s.distanceKm);
+  const distance=Number.isFinite(d)?`${d.toFixed(1)} km`:"距離情報なし";
+  const r=Number(s.rating);
+  const rating=Number.isFinite(r)&&r>0?`⭐ ${r.toFixed(1)}`:"評価情報なし";
+
+  $("#detailContent").innerHTML=`
+    <div class="plan-card">
+      <div class="plan-photo">${aiPlanEmoji(p.type,s)}</div>
+      <div class="plan-body">
+        <div class="plan-title">
+          <h2>${escapeHtmlGoogle(p.spotName||s.name||"名称不明")}</h2>
+          <span class="badge">${escapeHtmlGoogle(p.title||"AIプラン")}</span>
+        </div>
+        <div class="meta">
+          <span>📍 ${escapeHtmlGoogle(distance)}</span>
+          <span>${escapeHtmlGoogle(rating)}</span>
+          <span>${escapeHtmlGoogle(s.categoryLabel||s.category||"お出かけスポット")}</span>
+        </div>
+      </div>
+    </div>
+    <div class="form-card">
+      <h3>✨ AIの選定理由</h3>
+      <p style="line-height:1.7;">${escapeHtmlGoogle(p.reason||"")}</p>
+      ${s.address?`<p><small>📍 ${escapeHtmlGoogle(s.address)}</small></p>`:""}
+      <p><small>⚠️ ${escapeHtmlGoogle(p.caution||"営業時間・料金・設備は出発前に公式情報を確認してください。")}</small></p>
+    </div>
+    <div class="detail-actions">
+      <button class="secondary" data-go2="home">← 戻る</button>
+      <button class="primary" id="navStart">🚗 この場所へ行く</button>
+    </div>`;
+
+  const back=$("[data-go2]");
+  if(back)back.onclick=()=>go("home");
+  const nav=$("#navStart");
+  if(nav)nav.onclick=()=>{
+    if(Number.isFinite(Number(s.lat))&&Number.isFinite(Number(s.lon))){
+      window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(s.lat+","+s.lon)}`,"_blank");
+    }else{
+      alert("この施設の位置情報がありません。");
+    }
+  };
+  go("detail");
+}
+
+async function generateAIPlansV12(){
+  const status=$("#aiPlanStatus");
+  if(!latestWeekendCandidates.length){
+    if(status)status.textContent="先に現在地から実在スポットを取得してください";
+    return;
+  }
+
+  if(status)status.textContent="✨ AIが3プランを考えています…";
+  $("#planCards").innerHTML=`
+    <div class="spot-loading">
+      ✨ 実在スポット${latestWeekendCandidates.length}件からAIが選定中…<br>
+      <small>今日のイチオシ・お得重視・子ども優先</small>
+    </div>`;
+
+  try{
+    const response=await fetch(`${WEEKEND_AI_API}/plans-v12`,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        candidates:latestWeekendCandidates,
+        conditions:buildAIConditions()
+      })
+    });
+
+    const result=await response.json().catch(()=>null);
+
+    if(!response.ok||!result?.ok){
+      throw new Error(result?.detail||result?.error||`HTTP ${response.status}`);
+    }
+
+    const plans=Array.isArray(result.plans)?result.plans:[];
+    if(plans.length!==3)throw new Error("3プランを取得できませんでした");
+
+    renderAIPlans(plans);
+    if(status)status.textContent=`v1.2 AI：実在候補${result.candidateCount||latestWeekendCandidates.length}件から3プラン作成`;
+  }catch(error){
+    console.error("v1.2 AIプラン生成エラー",error);
+    if(status)status.textContent=`AIプラン生成エラー：${error?.message||"不明なエラー"}`;
+    $("#planCards").innerHTML=`
+      <div class="spot-loading">
+        ⚠️ AIプランを作成できませんでした。<br>
+        <small>${escapeHtmlGoogle(error?.message||"")}</small><br>
+        <button class="retry-spots" id="retryAIPlans">もう一度AIで作る</button>
+      </div>`;
+    const retry=$("#retryAIPlans");
+    if(retry)retry.onclick=generateAIPlansV12;
+  }
+}
+
 async function testGoogleV10() {
   const status = document.getElementById("spotStatus");
   const cards = document.getElementById("realSpotCards");
@@ -212,7 +1041,7 @@ async function testGoogleV10() {
 
   try {
     // --------------------------------------------
-    // Worker v1.1
+    // Worker v1.0
     // --------------------------------------------
     const apiUrl =
       `${WEEKEND_AI_API}/spots-v10` +
@@ -238,6 +1067,10 @@ async function testGoogleV10() {
 
     const originalCount =
       Number(data.originalCount) || 0;
+
+    latestWeekendCandidates = spots;
+    const aiStatus=$("#aiPlanStatus");
+    if(aiStatus)aiStatus.textContent="実在スポット取得完了。上の「いつもの条件でAI提案」で3プランを作れます";
 
     // --------------------------------------------
     // ステータス
@@ -378,13 +1211,13 @@ ${
 
   } catch (error) {
     console.error(
-      "v1.1 おすすめ候補エラー",
+      "v1.0 おすすめ候補エラー",
       error
     );
 
     if (status) {
       status.textContent =
-        "v1.1エラー：" +
+        "v1.0エラー：" +
         (error?.message || "不明なエラー");
     }
 
@@ -405,7 +1238,7 @@ ${
 
 
 // ================================================
-// v1.1 更新ボタン
+// v1.0テストボタン
 // ================================================
 document.addEventListener(
   "DOMContentLoaded",

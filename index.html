@@ -4,703 +4,116 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#f7fbf6">
-<title>週末AI v1.1</title>
+<title>週末AI MVP</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
-
 <body>
-
 <div class="app">
-
 <header class="topbar">
-  <div>
-    <div class="brand">週末AI</div>
-    <div class="sub">家族のお出かけを、まるごとAIで。</div>
-  </div>
-
+  <div><div class="brand">週末AI</div><div class="sub">家族のお出かけを、まるごとAIで。</div></div>
   <button class="iconbtn" id="profileBtn">👤</button>
 </header>
 
-
 <main>
-
-<!-- =========================
-     ホーム
-========================= -->
-
 <section id="home" class="screen active home-screen">
-
   <div class="home-sky">
-
-    <span class="cloud cloud-a">☁</span>
-    <span class="cloud cloud-b">☁</span>
-
-    <span class="spark spark-a">✦</span>
-    <span class="spark spark-b">✧</span>
-
-    <div class="home-kicker">
-      FAMILY WEEKEND PLANNER
-    </div>
-
-    <h1>
-      今週末、<span>どこ行く？</span>
-    </h1>
-
-    <p>
-      家族にぴったりのお出かけをAIが考えるよ。
-    </p>
-
-
-    <!-- 今日カード -->
-
+    <span class="cloud cloud-a">☁</span><span class="cloud cloud-b">☁</span>
+    <span class="spark spark-a">✦</span><span class="spark spark-b">✧</span>
+    <div class="home-kicker">FAMILY WEEKEND PLANNER</div>
+    <h1>今週末、<span>どこ行く？</span></h1>
+    <p>家族にぴったりのお出かけをAIが考えるよ。</p>
     <div class="today-card">
-
       <div class="today-row">
-
-        <div>
-          <small>出発 → 帰着</small>
-
-          <b>
-            <span id="currentPlaceLabel">
-              📍 現在地
-            </span>
-            →
-            🏠 自宅
-          </b>
-        </div>
-
-
-        <div
-          class="weather-mini"
-          id="weatherMini"
-        >
-
-          <span id="weatherIcon">
-            🌤️
-          </span>
-
-          <b id="weatherTemp">
-            --°
-          </b>
-
-          <small id="weatherText">
-            取得前
-          </small>
-
-        </div>
-
+        <div><small>出発 → 帰着</small><b><span id="currentPlaceLabel">📍 現在地</span> → 🏠 自宅</b></div>
+        <div class="weather-mini" id="weatherMini"><span id="weatherIcon">🌤️</span><b id="weatherTemp">--°</b><small id="weatherText">取得前</small></div>
       </div>
-
-
-      <!-- 現在地 -->
-
-      <div class="location-tools">
-
-        <button
-          type="button"
-          id="getLocationBtn"
-          onclick="useCurrentLocation()"
-        >
-          📍 現在地と天気を取得
-        </button>
-
-
-        <button
-          type="button"
-          id="manualLocationBtn"
-        >
-          ✏️ 場所を入力
-        </button>
-
-      </div>
-
-
-      <div class="today-tags">
-
-        <span>
-          🕙 10:00 → 17:00
-        </span>
-
-        <span>
-          👨‍👩‍👶 家族3人
-        </span>
-
-        <span>
-          🚗 車
-        </span>
-
-      </div>
-
+      <div class="location-tools"><button type="button" id="getLocationBtn">📍 現在地と天気を取得</button><button type="button" id="manualLocationBtn">✏️ 場所を入力</button></div><div class="today-tags"><span>🕙 10:00 → 17:00</span><span>👨‍👩‍👶 家族3人</span><span>🚗 車</span></div>
     </div>
-
-
-    <!-- AIボタン -->
-
     <div class="hero-actions cute-actions">
-
-      <button
-        class="primary"
-        id="quickPlan"
-      >
-
-        <span class="action-icon">
-          ✨
-        </span>
-
-        <span>
-          <b>
-            いつもの条件でAI提案
-          </b>
-
-          <small>
-            ワンタップで3プラン
-          </small>
-        </span>
-
-      </button>
-
-
-      <button
-        class="secondary"
-        id="nowPlan"
-      >
-
-        <span class="action-icon">
-          ⚡
-        </span>
-
-        <span>
-          <b>
-            今からお出かけ
-          </b>
-
-          <small>
-            現在地からサクッと
-          </small>
-        </span>
-
-      </button>
-
+      <button class="primary" id="quickPlan"><span class="action-icon">✨</span><span><b>いつもの条件でAI提案</b><small>ワンタップで3プラン</small></span></button>
+      <button class="secondary" id="nowPlan"><span class="action-icon">⚡</span><span><b>今からお出かけ</b><small>現在地からサクッと</small></span></button>
     </div>
-
   </div>
-
-
-
-  <!-- おすすめ -->
 
   <div class="section-head recommendation-head">
-
-    <div>
-
-      <small class="eyebrow">
-        FOR YOUR FAMILY
-      </small>
-
-      <h2>
-        今日のおすすめ 3プラン
-      </h2>
-
-    </div>
-
-
-    <button
-      class="linkbtn condition-chip"
-      data-go="settings"
-    >
-      ⚙️ 条件を変える
-    </button>
-
+    <div><small class="eyebrow">FOR YOUR FAMILY</small><h2>今日のおすすめ 3プラン</h2></div>
+    <button class="linkbtn condition-chip" data-go="settings">⚙️ 条件を変える</button>
   </div>
-
-
-  <div
-    id="planCards"
-    class="cards home-plan-cards"
-  ></div>
-
-
-
-  <!-- =========================
-       実在スポット
-  ========================= -->
-
+  <div id="aiPlanStatus" class="spot-status">実在スポット取得後にAIで3プランを作れます</div>
+  <div id="planCards" class="cards home-plan-cards"></div>
   <section class="nearby-section">
-
     <div class="section-head">
-
-      <div>
-
-        <small class="eyebrow">
-          REAL PLACES NEAR YOU
-        </small>
-
-        <h2>
-          📍 周辺の実在スポット
-        </h2>
-
-      </div>
-
-
-      <span
-        id="spotStatus"
-        class="spot-status"
-      >
-        現在地取得後に検索できます
-      </span>
-
+      <div><small class="eyebrow">REAL PLACES NEAR YOU</small><h2>📍 周辺の実在スポット</h2></div>
+      <span id="spotStatus" class="spot-status">現在地取得後に検索できます</span>
     </div>
-
-
-    <!-- v1.1 おすすめ候補更新 -->
-
-    <button
-      id="googleV10TestBtn"
-      type="button"
-      onclick="testGoogleV10()"
-      class="spot-refresh-btn"
-    >
-      ⭐ v1.1 おすすめ候補を更新
-    </button>
-
-    <!-- 検索結果 -->
-
-    <div
-      id="realSpotCards"
-      class="real-spot-cards"
-    ></div>
-
-
-    <div class="osm-credit">
-      施設候補データ：
-      Google Places
-    </div>
-
+    <div id="realSpotCards" class="real-spot-cards"></div>
+    <div class="osm-credit">施設候補データ：Google Places</div>
   </section>
 
-
-
-  <!-- お得 -->
-
   <div class="saving-card cute-saving">
-
-    <div class="saving-coin">
-      ¥
-    </div>
-
-
-    <div class="saving-copy">
-
-      <small>
-        今月のお得
-      </small>
-
-      <strong id="monthlySaving">
-        ¥0
-      </strong>
-
-      <span>
-        お出かけするほど、お得がたまる ✨
-      </span>
-
-    </div>
-
-
-    <div class="saving-stars">
-      ✦<br>✧
-    </div>
-
+    <div class="saving-coin">¥</div>
+    <div class="saving-copy"><small>今月のお得</small><strong id="monthlySaving">¥0</strong><span>お出かけするほど、お得がたまる ✨</span></div>
+    <div class="saving-stars">✦<br>✧</div>
   </div>
-
-
-  <div class="home-note">
-    🌿 家族の思い出が、またひとつ増えますように。
-  </div>
-
+  <div class="home-note">🌿 家族の思い出が、またひとつ増えますように。</div>
 </section>
 
-
-
-<!-- =========================
-     条件設定
-========================= -->
-
-<section
-  id="settings"
-  class="screen"
->
-
-  <div class="section-head">
-
-    <h2>
-      条件設定
-    </h2>
-
-    <button
-      class="linkbtn"
-      id="loadDefault"
-    >
-      いつもの条件を使う
-    </button>
-
-  </div>
-
-
-  <form
-    id="conditionForm"
-    class="form-card"
-  >
-
-    <label>
-      出発地点
-      <input
-        id="startPlace"
-        value="自宅"
-      >
-    </label>
-
-
-    <label>
-      帰着地点
-      <input
-        id="endPlace"
-        value="自宅"
-      >
-    </label>
-
-
-    <div class="grid2">
-
-      <label>
-        出発時間
-
-        <input
-          id="startTime"
-          type="time"
-          value="10:00"
-        >
-      </label>
-
-
-      <label>
-        帰宅時間
-
-        <input
-          id="endTime"
-          type="time"
-          value="17:00"
-        >
-      </label>
-
-    </div>
-
-
-    <div class="grid2">
-
-      <label>
-        予算
-
-        <input
-          id="budget"
-          type="number"
-          value="5000"
-          min="0"
-          step="500"
-        >
-      </label>
-
-
-      <label>
-        片道上限（分）
-
-        <input
-          id="maxTravel"
-          type="number"
-          value="60"
-          min="10"
-        >
-      </label>
-
-    </div>
-
-
-    <label>
-      子どもの年齢・月齢
-
-      <input
-        id="childAge"
-        value="0歳"
-      >
-    </label>
-
-
+<section id="settings" class="screen">
+  <div class="section-head"><h2>条件設定</h2><button class="linkbtn" id="loadDefault">いつもの条件を使う</button></div>
+  <form id="conditionForm" class="form-card">
+    <label>出発地点<input id="startPlace" value="自宅"></label>
+    <label>帰着地点<input id="endPlace" value="自宅"></label>
+    <div class="grid2"><label>出発時間<input id="startTime" type="time" value="10:00"></label><label>帰宅時間<input id="endTime" type="time" value="17:00"></label></div>
+    <div class="grid2"><label>予算<input id="budget" type="number" value="5000" min="0" step="500"></label><label>片道上限（分）<input id="maxTravel" type="number" value="60" min="10"></label></div>
+    <label>子どもの年齢・月齢<input id="childAge" value="0歳"></label>
     <div class="checks">
-
-      <label>
-        <input
-          id="highway"
-          type="checkbox"
-          checked
-        >
-        高速OK
-      </label>
-
-
-      <label>
-        <input
-          id="indoor"
-          type="checkbox"
-        >
-        屋内優先
-      </label>
-
-
-      <label>
-        <input
-          id="lunch"
-          type="checkbox"
-          checked
-        >
-        ランチあり
-      </label>
-
-
-      <label>
-        <input
-          id="supermarket"
-          type="checkbox"
-        >
-        帰りにスーパー
-      </label>
-
+      <label><input id="highway" type="checkbox" checked> 高速OK</label>
+      <label><input id="indoor" type="checkbox"> 屋内優先</label>
+      <label><input id="lunch" type="checkbox" checked> ランチあり</label>
+      <label><input id="supermarket" type="checkbox"> 帰りにスーパー</label>
     </div>
-
-
     <div class="form-actions">
-
-      <button
-        type="button"
-        class="secondary"
-        id="saveDefault"
-      >
-        この条件をデフォルト保存
-      </button>
-
-
-      <button
-        type="submit"
-        class="primary"
-      >
-        ✨ この条件で3プラン作る
-      </button>
-
+      <button type="button" class="secondary" id="saveDefault">この条件をデフォルト保存</button>
+      <button type="submit" class="primary">✨ この条件で3プラン作る</button>
     </div>
-
   </form>
-
 </section>
 
-
-
-<!-- =========================
-     プラン詳細
-========================= -->
-
-<section
-  id="detail"
-  class="screen"
->
-
-  <button
-    class="back"
-    data-go="home"
-  >
-    ← プラン一覧
-  </button>
-
-
+<section id="detail" class="screen">
+  <button class="back" data-go="home">← プラン一覧</button>
   <div id="detailContent"></div>
-
 </section>
 
-
-
-<!-- =========================
-     持ち物
-========================= -->
-
-<section
-  id="packing"
-  class="screen"
->
-
-  <div class="section-head">
-
-    <h2>
-      🎒 持ち物
-    </h2>
-
-    <span id="packingProgress"></span>
-
-  </div>
-
-
-  <div
-    id="packingList"
-    class="form-card"
-  ></div>
-
+<section id="packing" class="screen">
+  <div class="section-head"><h2>🎒 持ち物</h2><span id="packingProgress"></span></div>
+  <div id="packingList" class="form-card"></div>
 </section>
 
-
-
-<!-- =========================
-     保存
-========================= -->
-
-<section
-  id="saved"
-  class="screen"
->
-
-  <h2>
-    ♡ 保存したプラン
-  </h2>
-
-
-  <div
-    id="savedPlans"
-    class="cards"
-  ></div>
-
+<section id="saved" class="screen">
+  <h2>♡ 保存したプラン</h2>
+  <div id="savedPlans" class="cards"></div>
 </section>
 
-
-
-<!-- =========================
-     マイページ
-========================= -->
-
-<section
-  id="mypage"
-  class="screen"
->
-
-  <h2>
-    👤 マイページ
-  </h2>
-
-
+<section id="mypage" class="screen">
+  <h2>👤 マイページ</h2>
   <div class="form-card">
-
-    <h3>
-      家族プロフィール
-    </h3>
-
-
-    <label>
-      家族構成
-
-      <input
-        id="family"
-        value="大人2人・子ども1人"
-      >
-    </label>
-
-
-    <label>
-      授乳間隔（時間）
-
-      <input
-        id="milkInterval"
-        type="number"
-        value="4"
-        min="1"
-      >
-    </label>
-
-
-    <label>
-      ミルク1回量（ml）
-
-      <input
-        id="milkAmount"
-        type="number"
-        value="200"
-        min="0"
-      >
-    </label>
-
-
-    <label>
-      お昼寝の目安
-
-      <input
-        id="napTime"
-        type="time"
-        value="13:30"
-      >
-    </label>
-
-
-    <button
-      class="primary"
-      id="saveProfile"
-    >
-      プロフィール保存
-    </button>
-
+    <h3>家族プロフィール</h3>
+    <label>家族構成<input id="family" value="大人2人・子ども1人"></label>
+    <label>授乳間隔（時間）<input id="milkInterval" type="number" value="4" min="1"></label>
+    <label>ミルク1回量（ml）<input id="milkAmount" type="number" value="200" min="0"></label>
+    <label>お昼寝の目安<input id="napTime" type="time" value="13:30"></label>
+    <button class="primary" id="saveProfile">プロフィール保存</button>
   </div>
-
 </section>
-
 </main>
 
-
-
-<!-- =========================
-     下部ナビ
-========================= -->
-
 <nav class="bottomnav">
-
-  <button data-go="home">
-    🏠
-    <span>ホーム</span>
-  </button>
-
-  <button data-go="settings">
-    ⚙️
-    <span>条件</span>
-  </button>
-
-  <button data-go="saved">
-    ♡
-    <span>保存</span>
-  </button>
-
-  <button data-go="packing">
-    🎒
-    <span>持ち物</span>
-  </button>
-
-  <button data-go="mypage">
-    👤
-    <span>マイページ</span>
-  </button>
-
+<button data-go="home">🏠<span>ホーム</span></button>
+<button data-go="settings">⚙️<span>条件</span></button>
+<button data-go="saved">♡<span>保存</span></button>
+<button data-go="packing">🎒<span>持ち物</span></button>
+<button data-go="mypage">👤<span>マイページ</span></button>
 </nav>
-
-
 </div>
-
-
-<!-- =========================
-     JavaScript
-========================= -->
-
-<script src="./js/app.js?v=1.1"></script>
-
-
-</body>
-</html>
+<script src="js/app.js"></script>
+</body></html>
