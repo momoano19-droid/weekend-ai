@@ -1146,6 +1146,20 @@ async function generateDayPlanV14(mainSpot){
 
     const plan=result.dayPlan||{};
     const timeline=Array.isArray(plan.timeline)?plan.timeline:[];
+   const routes = plan.routes || {};
+
+const homeToMain = routes.homeToMain || null;
+const mainToAfternoon = routes.mainToAfternoon || null;
+const lastToHome = routes.lastToHome || null;
+
+const estimatedHomeArrival =
+  plan.estimatedHomeArrival || "";
+
+const requestedReturnTime =
+  plan.requestedReturnTime || "";
+
+const shortenedForReturnTime =
+  plan.shortenedForReturnTime === true;
     const icon=t=>t==="departure"?"🏠":t==="spot"?"📍":t==="lunch"?"🍴":t==="return"?"🏠":"🕒";
 
     const rows=timeline.length?timeline.map(item=>`
@@ -1159,6 +1173,72 @@ async function generateDayPlanV14(mainSpot){
     box.innerHTML=`
       <div style="margin-top:12px;">
         <h3>${escapeHtmlGoogle(plan.title||"今日の1日お出かけプラン")}</h3>
+        <div style="margin:10px 0;padding:12px;background:#f7faf7;border-radius:12px;">
+  <div style="font-weight:700;margin-bottom:8px;">
+    🚗 Google Routes 実走ルート
+  </div>
+
+  ${
+    homeToMain
+      ? `
+        <div style="margin-bottom:5px;">
+          🏠 出発 → メイン施設：
+          約${escapeHtml(String(homeToMain.durationMinutes))}分 /
+          ${escapeHtml(String(homeToMain.distanceKm))}km
+        </div>
+      `
+      : ""
+  }
+
+  ${
+    mainToAfternoon
+      ? `
+        <div style="margin-bottom:5px;">
+          📍 メイン施設 → 午後スポット：
+          約${escapeHtml(String(mainToAfternoon.durationMinutes))}分 /
+          ${escapeHtml(String(mainToAfternoon.distanceKm))}km
+        </div>
+      `
+      : ""
+  }
+
+  ${
+    lastToHome
+      ? `
+        <div style="margin-bottom:5px;">
+          🏠 最後の施設 → 帰宅：
+          約${escapeHtml(String(lastToHome.durationMinutes))}分 /
+          ${escapeHtml(String(lastToHome.distanceKm))}km
+        </div>
+      `
+      : ""
+  }
+
+  ${
+    estimatedHomeArrival
+      ? `
+        <div style="margin-top:8px;font-weight:700;">
+          🏠 帰宅予定 ${escapeHtml(estimatedHomeArrival)}
+          ${
+            requestedReturnTime
+              ? `（希望 ${escapeHtml(requestedReturnTime)}まで）`
+              : ""
+          }
+        </div>
+      `
+      : ""
+  }
+
+  ${
+    shortenedForReturnTime
+      ? `
+        <div style="margin-top:6px;font-size:12px;">
+          ⚡ 帰宅希望時刻を考慮して、午後の予定を短縮しました。
+        </div>
+      `
+      : ""
+  }
+</div>
         ${plan.summary?`<p style="line-height:1.7;">${escapeHtmlGoogle(plan.summary)}</p>`:""}
         <div>${rows}</div>
         ${plan.reason?`<div style="margin-top:12px;"><b>✨ このプランにした理由</b><p style="line-height:1.7;">${escapeHtmlGoogle(plan.reason)}</p></div>`:""}
