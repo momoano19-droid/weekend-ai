@@ -140,37 +140,66 @@ function renderRealSpots(spots,lat,lon){
   }).join("");
 }
 async function fetchRealSpots(lat,lon){
-  $("#spotStatus").textContent="検索中…";
-  $("#realSpotCards").innerHTML='<div class="spot-loading">🔎 現在地周辺の実在スポットを探しています…</div>';
-  const radius=30000;
+  const status=$("#spotStatus"), box=$("#realSpotCards");
+  status.textContent="検索準備中…";
+  box.innerHTML='<div class="spot-loading">🔎 現在地周辺の実在スポットを探しています…<br><small id="spotDiag">検索サーバーへ接続します</small></div>';
+  const radius=20000;
   const filters=[
     '["tourism"~"aquarium|zoo|museum|theme_park|attraction"]',
     '["leisure"~"park|playground|nature_reserve"]',
     '["amenity"="arts_centre"]'
   ];
   const body=filters.map(f=>`nwr(around:${radius},${lat},${lon})${f}["name"];`).join("");
-  const query=`[out:json][timeout:25];(${body});out center tags;`;
-  try{
-    const r=await fetch("https://overpass-api.de/api/interpreter",{
-      method:"POST",
-      headers:{"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},
-      body:"data="+encodeURIComponent(query)
-    });
-    if(!r.ok) throw new Error("HTTP "+r.status);
-    const data=await r.json();
-    const seen=new Set();
-    const spots=(data.elements||[]).filter(x=>{
-      const n=x.tags?.name; if(!n||seen.has(n))return false; seen.add(n); return true;
-    }).sort((a,b)=>{
-      const ac=a.lat??a.center?.lat, ao=a.lon??a.center?.lon, bc=b.lat??b.center?.lat, bo=b.lon??b.center?.lon;
-      return kmBetween(lat,lon,ac,ao)-kmBetween(lat,lon,bc,bo);
-    });
-    $("#spotStatus").textContent=`${spots.length}件見つかりました`;
-    renderRealSpots(spots,lat,lon);
-  }catch(e){
-    $("#spotStatus").textContent="検索失敗";
-    $("#realSpotCards").innerHTML='<div class="spot-loading">施設検索サーバーが混雑している可能性があります。少し時間を空けてもう一度お試しください。</div>';
+  const query=`[out:json][timeout:18];(${body});out center tags;`;
+
+  // 日本向けを優先し、障害時は別の公開インスタンスへ自動切替
+  const endpoints=[
+    ["Overpass Japan","https://overpass.openstreetmap.jp/api/interpreter"],
+    ["Private.coffee","https://overpass.private.coffee/api/interpreter"],
+    ["Overpass Main","https://overpass-api.de/api/interpreter"]
+  ];
+  let lastError="";
+  for(let i=0;i<endpoints.length;i++){
+    const [label,url]=endpoints[i];
+    status.textContent=`検索中 ${i+1}/${endpoints.length}`;
+    const diag=document.querySelector("#spotDiag");
+    if(diag) diag.textContent=`${label} に接続中…`;
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),22000);
+    const started=Date.now();
+    try{
+      const r=await fetch(url,{
+        method:"POST",
+        headers:{"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},
+        body:"data="+encodeURIComponent(query),
+        signal:controller.signal
+      });
+      clearTimeout(timer);
+      if(!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data=await r.json();
+      const seen=new Set();
+      const spots=(data.elements||[]).filter(x=>{
+        const n=x.tags?.name;
+        if(!n||seen.has(n)) return false;
+        seen.add(n); return true;
+      }).sort((a,b)=>{
+        const ac=a.lat??a.center?.lat, ao=a.lon??a.center?.lon;
+        const bc=b.lat??b.center?.lat, bo=b.lon??b.center?.lon;
+        return kmBetween(lat,lon,ac,ao)-kmBetween(lat,lon,bc,bo);
+      });
+      const sec=((Date.now()-started)/1000).toFixed(1);
+      status.textContent=`成功 ${spots.length}件・${sec}秒`;
+      renderRealSpots(spots,lat,lon);
+      return;
+    }catch(e){
+      clearTimeout(timer);
+      lastError = e.name==="AbortError" ? `${label}: タイムアウト` : `${label}: ${e.message}`;
+      const diag2=document.querySelector("#spotDiag");
+      if(diag2) diag2.textContent=`${lastError} → 次のサーバーを試します`;
+    }
   }
+  status.textContent="API接続失敗";
+  box.innerHTML=`<div class="spot-loading">⚠️ 実在スポットを取得できませんでした。<br><small>${escapeHtml(lastError)}</small><br><button class="retry-spots" onclick="searchRealSpotsFromSavedLocation()">もう一度検索</button></div>`;
 }
 async function searchRealSpotsFromSavedLocation(){
   const c=JSON.parse(localStorage.getItem("weekend_ai_coords_v1")||"null");

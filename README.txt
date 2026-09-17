@@ -48,3 +48,9 @@ css フォルダ
 js フォルダ
 .nojekyll
 README.txt
+
+v0.5.1:
+- 実在スポット検索の診断表示を追加
+- 20km圏に軽量化
+- Overpass Japan → Private.coffee → Main の順で自動フォールバック
+- 22秒タイムアウト、HTTPエラー表示、再検索ボタンを追加

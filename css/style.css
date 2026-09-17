@@ -35,3 +35,6 @@ body{background:#edf3ee}.topbar{background:rgba(255,253,248,.95)}.brand:before{c
 .real-spot-icon{width:44px;height:44px;border-radius:14px;background:#edf8f1;display:grid;place-items:center;font-size:23px;flex:none}
 .real-spot-main{min-width:0;flex:1}.real-spot-main b{font-size:13px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.real-spot-main small{font-size:10px;color:#87928b}.real-spot-distance{font-size:11px;font-weight:900;color:#4e9367;white-space:nowrap}.osm-credit{text-align:right;font-size:8px;color:#a0aaa3;margin-top:7px}
 .spot-loading{padding:17px;text-align:center;color:#7d8d83;background:#f8fbf8;border-radius:17px;font-size:11px}
+
+.retry-spots{margin-top:10px;border:0;border-radius:999px;background:#5aa876;color:white;padding:8px 13px;font-size:10px;font-weight:800;cursor:pointer}
+.spot-loading small{display:inline-block;margin-top:5px;color:#98a29c}
