@@ -883,7 +883,7 @@ function renderAIPlans(plans){
   });
 }
 
-function openAIPlan(p){
+async function openAIPlan(p){
   selectedPlan=p;
   const s=p.spot||{};
   const d=Number(s.distanceKm);
@@ -891,6 +891,7 @@ function openAIPlan(p){
   const r=Number(s.rating);
   const rating=Number.isFinite(r)&&r>0?`⭐ ${r.toFixed(1)}`:"評価情報なし";
 
+  // まず基本情報を表示
   $("#detailContent").innerHTML=`
     <div class="plan-card">
       <div class="plan-photo">${aiPlanEmoji(p.type,s)}</div>
@@ -906,12 +907,18 @@ function openAIPlan(p){
         </div>
       </div>
     </div>
+
     <div class="form-card">
       <h3>✨ AIの選定理由</h3>
       <p style="line-height:1.7;">${escapeHtmlGoogle(p.reason||"")}</p>
       ${s.address?`<p><small>📍 ${escapeHtmlGoogle(s.address)}</small></p>`:""}
-      <p><small>⚠️ ${escapeHtmlGoogle(p.caution||"営業時間・料金・設備は出発前に公式情報を確認してください。")}</small></p>
     </div>
+
+    <div class="form-card" id="placeDetailsBox">
+      <h3>🏢 施設情報</h3>
+      <div class="spot-loading">🔎 Google Placesから最新の施設情報を確認中…</div>
+    </div>
+
     <div class="detail-actions">
       <button class="secondary" data-go2="home">← 戻る</button>
       <button class="primary" id="navStart">🚗 この場所へ行く</button>
@@ -919,6 +926,7 @@ function openAIPlan(p){
 
   const back=$("[data-go2]");
   if(back)back.onclick=()=>go("home");
+
   const nav=$("#navStart");
   if(nav)nav.onclick=()=>{
     if(Number.isFinite(Number(s.lat))&&Number.isFinite(Number(s.lon))){
@@ -927,7 +935,72 @@ function openAIPlan(p){
       alert("この施設の位置情報がありません。");
     }
   };
+
   go("detail");
+
+  const box=$("#placeDetailsBox");
+  if(!box)return;
+
+  if(!s.id){
+    box.innerHTML=`
+      <h3>🏢 施設情報</h3>
+      <p>詳細情報を取得するためのPlace IDがありません。</p>
+      <p><small>⚠️ 営業時間・料金・設備は出発前に公式情報を確認してください。</small></p>`;
+    return;
+  }
+
+  try{
+    const response=await fetch(
+      `${WEEKEND_AI_API}/place-details-v13?placeId=${encodeURIComponent(s.id)}`
+    );
+    const result=await response.json().catch(()=>null);
+
+    if(!response.ok||!result?.ok){
+      throw new Error(result?.detail||result?.error||`HTTP ${response.status}`);
+    }
+
+    const place=result.place||{};
+    const hours=Array.isArray(place.openingHours)?place.openingHours:[];
+
+    let openLabel="営業状況：情報なし";
+    if(place.openNow===true)openLabel="🟢 現在営業中";
+    if(place.openNow===false)openLabel="🔴 現在営業時間外";
+
+    const hoursHtml=hours.length
+      ? `<div style="margin-top:10px;"><b>🕒 営業時間</b><div style="margin-top:6px;line-height:1.7;">${
+          hours.map(x=>`<div>${escapeHtmlGoogle(x)}</div>`).join("")
+        }</div></div>`
+      : `<p><b>🕒 営業時間：</b>情報なし</p>`;
+
+    const phoneHtml=place.phone
+      ? `<p><b>☎️ 電話：</b><a href="tel:${escapeHtmlGoogle(place.phone)}">${escapeHtmlGoogle(place.phone)}</a></p>`
+      : `<p><b>☎️ 電話：</b>情報なし</p>`;
+
+    const websiteHtml=place.website
+      ? `<p><a class="primary" style="display:inline-block;text-decoration:none;" href="${escapeHtmlGoogle(place.website)}" target="_blank" rel="noopener">🌐 公式サイトを見る</a></p>`
+      : `<p><b>🌐 公式サイト：</b>情報なし</p>`;
+
+    const mapsHtml=place.googleMapsUrl
+      ? `<p><a class="secondary" style="display:inline-block;text-decoration:none;" href="${escapeHtmlGoogle(place.googleMapsUrl)}" target="_blank" rel="noopener">🗺️ Googleマップで確認</a></p>`
+      : "";
+
+    box.innerHTML=`
+      <h3>🏢 施設情報</h3>
+      <p><b>${escapeHtmlGoogle(openLabel)}</b></p>
+      ${place.address?`<p><b>📍 住所：</b>${escapeHtmlGoogle(place.address)}</p>`:""}
+      ${hoursHtml}
+      ${phoneHtml}
+      ${websiteHtml}
+      ${mapsHtml}
+      <p><small>⚠️ 営業時間・料金・設備は変更される場合があります。出発前に公式情報をご確認ください。</small></p>`;
+  }catch(error){
+    console.error("v1.3 施設詳細取得エラー",error);
+    box.innerHTML=`
+      <h3>🏢 施設情報</h3>
+      <p>⚠️ 施設詳細を取得できませんでした。</p>
+      <p><small>${escapeHtmlGoogle(error?.message||"")}</small></p>
+      <p><small>営業時間・料金・設備は出発前に公式情報を確認してください。</small></p>`;
+  }
 }
 
 async function generateAIPlansV12(){
