@@ -1116,6 +1116,56 @@ async function generateDayPlanV14(mainSpot){
   if(button){
     button.disabled=true;
     button.textContent="✨ AIが1日プランを作成中…";
+   // v1.6 現在地が未取得なら、ここで取得する
+if (!currentPosition) {
+  if (!navigator.geolocation) {
+    box.innerHTML =
+      "<p>⚠️ この端末では位置情報を利用できません。</p>";
+
+    if (button) {
+      button.disabled = false;
+      button.textContent =
+        "✨ この場所を中心に1日プランを作る";
+    }
+
+    return;
+  }
+
+  box.innerHTML =
+    '<p>📍 現在地を確認しています...</p>';
+
+  try {
+    const position = await new Promise(
+      (resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          resolve,
+          reject,
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 60000
+          }
+        );
+      }
+    );
+
+    currentPosition = {
+      lat: position.coords.latitude,
+      lon: position.coords.longitude
+    };
+  } catch (error) {
+    box.innerHTML =
+      "<p>⚠️ 現在地を取得できませんでした。位置情報の許可を確認してください。</p>";
+
+    if (button) {
+      button.disabled = false;
+      button.textContent =
+        "✨ この場所を中心に1日プランを作る";
+    }
+
+    return;
+  }
+}
   }
   box.innerHTML='<div class="spot-loading">🤖 無理のない1日を組み立てています…</div>';
 
