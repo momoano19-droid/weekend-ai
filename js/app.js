@@ -112,114 +112,76 @@ $("#manualLocationBtn").onclick=async()=>{
 const savedCoords=JSON.parse(localStorage.getItem("weekend_ai_coords_v1")||"null");
 if(savedCoords) loadWeather(savedCoords.latitude,savedCoords.longitude).catch(()=>{});
 
+// ===== v0.6 Yahoo! JAPAN / Cloudflare Worker 実在スポット候補 =====
+const WEEKEND_AI_API="https://weekend-ai-api.momo-ano19.workers.dev";
 
-// ===== v0.5 OpenStreetMap / Overpass 実在スポット候補 =====
 function kmBetween(a,b,c,d){
-  const R=6371, rad=x=>x*Math.PI/180;
-  const dLat=rad(c-a), dLon=rad(d-b);
+  const R=6371,rad=x=>x*Math.PI/180,dLat=rad(c-a),dLon=rad(d-b);
   const h=Math.sin(dLat/2)**2+Math.cos(rad(a))*Math.cos(rad(c))*Math.sin(dLon/2)**2;
   return 2*R*Math.asin(Math.sqrt(h));
 }
-function spotKind(tags={}){
-  const v=tags.tourism||tags.leisure||tags.amenity||"";
-  const map={
-    aquarium:["🐠","水族館"],zoo:["🦁","動物園"],museum:["🏛️","博物館・資料館"],
-    theme_park:["🎡","テーマパーク"],attraction:["✨","観光スポット"],
-    park:["🌳","公園"],playground:["🛝","遊び場"],nature_reserve:["🌿","自然"],
-    arts_centre:["🎨","文化・体験施設"]
-  };
-  return map[v]||["📍","お出かけスポット"];
+function escapeHtml(s=""){
+  return String(s).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+}
+function yahooSpotKind(x={}){
+  const t=((x.genres||[]).join(" ")+" "+(x.name||""));
+  if(/水族館/.test(t))return ["🐠","水族館"];
+  if(/動物園/.test(t))return ["🦁","動物園"];
+  if(/博物館|資料館|美術館|ミュージアム/.test(t))return ["🏛️","博物館・美術館"];
+  if(/遊園地|テーマパーク/.test(t))return ["🎡","テーマパーク"];
+  if(/公園|パーク/.test(t))return ["🌳","公園"];
+  if(/道の駅/.test(t))return ["🚗","道の駅"];
+  return ["📍",(x.genres||[])[0]||"お出かけスポット"];
 }
 function renderRealSpots(spots,lat,lon){
   const box=$("#realSpotCards");
-  if(!spots.length){box.innerHTML='<div class="spot-loading">周辺で条件に合う登録スポットが見つかりませんでした。</div>';return}
+  if(!spots.length){
+    box.innerHTML='<div class="spot-loading">周辺の登録スポットが見つかりませんでした。</div>';
+    return;
+  }
   box.innerHTML=spots.slice(0,12).map(x=>{
-    const t=x.tags||{}, k=spotKind(t), la=x.lat??x.center?.lat, lo=x.lon??x.center?.lon;
-    const dist=(la!=null&&lo!=null)?kmBetween(lat,lon,la,lo):null;
-    return `<div class="real-spot"><div class="real-spot-icon">${k[0]}</div><div class="real-spot-main"><b>${escapeHtml(t.name||"名称未登録")}</b><small>${k[1]}${t["addr:city"]?" ・ "+escapeHtml(t["addr:city"]):""}</small></div><div class="real-spot-distance">${dist!=null?dist.toFixed(1)+" km":""}</div></div>`;
+    const k=yahooSpotKind(x);
+    const dist=Number.isFinite(+x.lat)&&Number.isFinite(+x.lon)?kmBetween(lat,lon,+x.lat,+x.lon):null;
+    const sub=[k[1],x.address].filter(Boolean).map(escapeHtml).join(" ・ ");
+    return `<div class="real-spot"><div class="real-spot-icon">${k[0]}</div><div class="real-spot-main"><b>${escapeHtml(x.name||"名称不明")}</b><small>${sub}</small></div><div class="real-spot-distance">${dist!=null?dist.toFixed(1)+" km":""}</div></div>`;
   }).join("");
 }
 async function fetchRealSpots(lat,lon){
-  const status=$("#spotStatus"), box=$("#realSpotCards");
-  status.textContent="検索準備中…";
-  box.innerHTML='<div class="spot-loading">🔎 現在地周辺の実在スポットを探しています…<br><small id="spotDiag">検索サーバーへ接続します</small></div>';
-  const radius=20000;
-  const filters=[
-    '["tourism"~"aquarium|zoo|museum|theme_park|attraction"]',
-    '["leisure"~"park|playground|nature_reserve"]',
-    '["amenity"="arts_centre"]'
-  ];
-  const body=filters.map(f=>`nwr(around:${radius},${lat},${lon})${f}["name"];`).join("");
-  const query=`[out:json][timeout:18];(${body});out center tags;`;
-
-  // 日本向けを優先し、障害時は別の公開インスタンスへ自動切替
-  const endpoints=[
-    ["Overpass Japan","https://overpass.openstreetmap.jp/api/interpreter"],
-    ["Private.coffee","https://overpass.private.coffee/api/interpreter"],
-    ["Overpass Main","https://overpass-api.de/api/interpreter"]
-  ];
-  let lastError="";
-  for(let i=0;i<endpoints.length;i++){
-    const [label,url]=endpoints[i];
-    status.textContent=`検索中 ${i+1}/${endpoints.length}`;
-    const diag=document.querySelector("#spotDiag");
-    if(diag) diag.textContent=`${label} に接続中…`;
-    const controller=new AbortController();
-    const timer=setTimeout(()=>controller.abort(),22000);
-    const started=Date.now();
-    try{
-      const r=await fetch(url,{
-        method:"POST",
-        headers:{"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},
-        body:"data="+encodeURIComponent(query),
-        signal:controller.signal
-      });
-      clearTimeout(timer);
-      if(!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data=await r.json();
-      const seen=new Set();
-      const spots=(data.elements||[]).filter(x=>{
-        const n=x.tags?.name;
-        if(!n||seen.has(n)) return false;
-        seen.add(n); return true;
-      }).sort((a,b)=>{
-        const ac=a.lat??a.center?.lat, ao=a.lon??a.center?.lon;
-        const bc=b.lat??b.center?.lat, bo=b.lon??b.center?.lon;
-        return kmBetween(lat,lon,ac,ao)-kmBetween(lat,lon,bc,bo);
-      });
-      const sec=((Date.now()-started)/1000).toFixed(1);
-      status.textContent=`成功 ${spots.length}件・${sec}秒`;
-      renderRealSpots(spots,lat,lon);
-      return;
-    }catch(e){
-      clearTimeout(timer);
-      lastError = e.name==="AbortError" ? `${label}: タイムアウト` : `${label}: ${e.message}`;
-      const diag2=document.querySelector("#spotDiag");
-      if(diag2) diag2.textContent=`${lastError} → 次のサーバーを試します`;
-    }
+  const status=$("#spotStatus"),box=$("#realSpotCards");
+  status.textContent="Yahoo!で検索中…";
+  box.innerHTML='<div class="spot-loading">🔎 現在地周辺の実在スポットを探しています…<br><small>週末AI API → Yahoo! JAPAN</small></div>';
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);
+  try{
+    const r=await fetch(`${WEEKEND_AI_API}/spots?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`,{signal:controller.signal});
+    const j=await r.json().catch(()=>null);
+    clearTimeout(timer);
+    if(!r.ok||!j?.ok)throw new Error(j?.error||`HTTP ${r.status}`);
+    const spots=Array.isArray(j.spots)?j.spots:[];
+    status.textContent=`Yahoo! ${spots.length}件取得`;
+    renderRealSpots(spots,lat,lon);
+  }catch(e){
+    clearTimeout(timer);
+    const msg=e.name==="AbortError"?"検索がタイムアウトしました":e.message;
+    status.textContent="施設検索エラー";
+    box.innerHTML=`<div class="spot-loading">⚠️ 実在スポットを取得できませんでした。<br><small>${escapeHtml(msg)}</small><br><button class="retry-spots" onclick="searchRealSpotsFromSavedLocation()">もう一度検索</button></div>`;
   }
-  status.textContent="API接続失敗";
-  box.innerHTML=`<div class="spot-loading">⚠️ 実在スポットを取得できませんでした。<br><small>${escapeHtml(lastError)}</small><br><button class="retry-spots" onclick="searchRealSpotsFromSavedLocation()">もう一度検索</button></div>`;
 }
 async function searchRealSpotsFromSavedLocation(){
   const c=JSON.parse(localStorage.getItem("weekend_ai_coords_v1")||"null");
   if(!c){$("#spotStatus").textContent="先に現在地を取得してください";return}
-  await fetchRealSpots(c.latitude,c.longitude);
+  await fetchRealSpots(+c.latitude,+c.longitude);
 }
-// 現在地取得成功後、施設候補も更新
-const originalUseCurrentLocation=useCurrentLocation;
 useCurrentLocation=function(){
-  if(!navigator.geolocation){alert("このブラウザは位置情報に対応していません。場所入力を使ってください。");return}
-  $("#weatherText").textContent="取得中…";
+  if(!navigator.geolocation){alert("このブラウザは位置情報に対応していません。");return}
+  $("#weatherText").textContent="取得中…";$("#spotStatus").textContent="現在地取得中…";
   navigator.geolocation.getCurrentPosition(async pos=>{
-    try{
-      const {latitude,longitude}=pos.coords;
-      setPlaceLabel("現在地");
-      localStorage.setItem("weekend_ai_coords_v1",JSON.stringify({latitude,longitude}));
-      await loadWeather(latitude,longitude);
-      await fetchRealSpots(latitude,longitude);
-    }catch(e){$("#weatherText").textContent="取得失敗";alert("現在地データの取得中にエラーが発生しました。")}
-  },()=>{ $("#weatherText").textContent="未取得"; alert("位置情報を取得できませんでした。"); },
+    const {latitude,longitude}=pos.coords;
+    setPlaceLabel("現在地");
+    localStorage.setItem("weekend_ai_coords_v1",JSON.stringify({latitude,longitude}));
+    try{await loadWeather(latitude,longitude)}catch(e){$("#weatherText").textContent="取得失敗"}
+    await fetchRealSpots(latitude,longitude);
+  },()=>{$("#weatherText").textContent="未取得";$("#spotStatus").textContent="現在地未取得";alert("位置情報を取得できませんでした。");},
   {enableHighAccuracy:true,timeout:10000,maximumAge:300000});
 };
 $("#getLocationBtn").onclick=useCurrentLocation;
+if(savedCoords)fetchRealSpots(+savedCoords.latitude,+savedCoords.longitude);
