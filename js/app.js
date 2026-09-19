@@ -1209,6 +1209,8 @@ const homeToMain = routes.homeToMain || null;
 const mainToLunch = routes.mainToLunch || null;
 const lunchToAfternoon = routes.lunchToAfternoon || null;
 const mainToAfternoon = routes.mainToAfternoon || null;
+const lastToShopping = routes.lastToShopping || null;
+const shoppingToHome = routes.shoppingToHome || null;
 const lastToHome = routes.lastToHome || null;
 
 const estimatedHomeArrival =
@@ -1282,7 +1284,31 @@ const shortenedForReturnTime =
   }
 
   ${
-    lastToHome
+  lastToShopping && shoppingToHome
+    ? `
+      <div style="margin-bottom:5px;">
+        🛒 最後の施設 → スーパー：
+        約${escapeHtml(String(lastToShopping.durationMinutes))}分 /
+        ${escapeHtml(String(lastToShopping.distanceKm))}km
+      </div>
+
+      <div style="margin-bottom:5px;">
+        🏠 スーパー → 自宅：
+        約${escapeHtml(String(shoppingToHome.durationMinutes))}分 /
+        ${escapeHtml(String(shoppingToHome.distanceKm))}km
+      </div>
+
+      ${
+        lastToShopping.detourMinutes != null
+          ? `
+            <div style="margin-bottom:5px;">
+              ↪ 寄り道：約＋${escapeHtml(String(lastToShopping.detourMinutes))}分
+            </div>
+          `
+          : ""
+      }
+    `
+    : lastToHome
       ? `
         <div style="margin-bottom:5px;">
           🏠 最後の施設 → 帰宅：
@@ -1291,7 +1317,7 @@ const shortenedForReturnTime =
         </div>
       `
       : ""
-  }
+}
 
   ${
     estimatedHomeArrival
