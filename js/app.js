@@ -12,11 +12,33 @@ const templates=[
  {tag:"近場でゆったり",title:"公園＋ベーカリー",emoji:"🌳",cost:2800,saving:650,travel:20,highway:0,return:"15:50",stops:["自宅を出発","大型公園","人気ベーカリー","買い物","帰宅"]}
 ];
 
-function data(){return {
- startPlace:$("#startPlace").value,endPlace:$("#endPlace").value,startTime:$("#startTime").value,endTime:$("#endTime").value,
- budget:+$("#budget").value,maxTravel:+$("#maxTravel").value,childAge:$("#childAge").value,highway:$("#highway").checked,
- indoor:$("#indoor").checked,lunch:$("#lunch").checked,supermarket:$("#supermarket").checked
-}}
+function data(){
+  return {
+    startPlace: $("#startPlace").value,
+    endPlace: $("#endPlace").value,
+    startTime: $("#startTime").value,
+    endTime: $("#endTime").value,
+
+    budget: +$("#budget").value,
+    maxTravel: +$("#maxTravel").value,
+    childAge: $("#childAge").value,
+
+    highway: $("#highway").checked,
+    lunch: $("#lunch").checked,
+    indoor: $("#indoor").checked,
+    supermarket: $("#supermarket").checked,
+
+    // v1.9 子どもの生活リズム
+    milkEnabled: $("#milkEnabled")?.checked || false,
+    milkInterval: +($("#milkInterval")?.value || 3),
+
+    napEnabled: $("#napEnabled")?.checked || false,
+    napStart: $("#napStart")?.value || "13:00",
+    napEnd: $("#napEnd")?.value || "14:00",
+
+    childPace: $("#childPace")?.value || "standard"
+  };
+}
 function apply(d){if(!d)return; Object.entries(d).forEach(([k,v])=>{let e=$("#"+k); if(e) e.type==="checkbox"?e.checked=v:e.value=v})}
 function go(id){$$(".screen").forEach(x=>x.classList.toggle("active",x.id===id)); $$(".bottomnav button").forEach(x=>x.classList.toggle("active",x.dataset.go===id)); scrollTo(0,0); if(id==="saved")renderSaved(); if(id==="packing")renderPacking()}
 $$("[data-go]").forEach(b=>b.onclick=()=>go(b.dataset.go));
