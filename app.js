@@ -12,37 +12,24 @@ const templates=[
  {tag:"近場でゆったり",title:"公園＋ベーカリー",emoji:"🌳",cost:2800,saving:650,travel:20,highway:0,return:"15:50",stops:["自宅を出発","大型公園","人気ベーカリー","買い物","帰宅"]}
 ];
 
-function data(){
- const val=(id,fallback="")=>$(id)?.value ?? fallback;
- const checked=(id,fallback=false)=>$(id)?$(id).checked:fallback;
- return {
-  startPlace:val("#startPlace"),endPlace:val("#endPlace"),startTime:val("#startTime"),endTime:val("#endTime"),
-  budget:+val("#budget",0),maxTravel:+val("#maxTravel",0),childAge:val("#childAge"),highway:checked("#highway"),
-  indoor:checked("#indoor"),lunch:checked("#lunch"),supermarket:checked("#supermarket"),
-  milkEnabled:checked("#milkEnabled"),milkInterval:+val("#milkInterval",4)||4,milkAmount:+val("#milkAmount",0)||0,
-  napEnabled:checked("#napEnabled"),napStart:val("#napStart","13:00"),napEnd:val("#napEnd","14:30"),
-  childPace:val("#childPace","normal")
- };
-}
+function data(){return {
+ startPlace:$("#startPlace").value,endPlace:$("#endPlace").value,startTime:$("#startTime").value,endTime:$("#endTime").value,
+ budget:+$("#budget").value,maxTravel:+$("#maxTravel").value,childAge:$("#childAge").value,highway:$("#highway").checked,
+ indoor:$("#indoor").checked,lunch:$("#lunch").checked,supermarket:$("#supermarket").checked,
+ babyMilkEnabled:$("#babyMilkEnabled")?.checked===true,babyMilkInterval:Number($("#babyMilkInterval")?.value||4),
+ babyMilkAmount:Number($("#babyMilkAmount")?.value||200),babyNapEnabled:$("#babyNapEnabled")?.checked===true,
+ babyNapStart:$("#babyNapStart")?.value||"13:00",babyNapEnd:$("#babyNapEnd")?.value||"14:30",
+ babyChildPace:$("#babyChildPace")?.value||"normal"
+}}
 function apply(d){
  if(!d)return;
- Object.entries(d).forEach(([k,v])=>{
-   const e=$("#"+k);
-   if(!e)return;
-   if(e.type==="checkbox") e.checked=Boolean(v);
-   else e.value=v ?? "";
- });
+ Object.entries(d).forEach(([k,v])=>{const e=$("#"+k);if(!e)return;if(e.type==="checkbox")e.checked=Boolean(v);else e.value=v??"";});
 }
-function go(id){$$(".screen").forEach(x=>x.classList.toggle("active",x.id===id)); $$(".bottomnav button").forEach(x=>x.classList.toggle("active",x.dataset.go===id)); scrollTo(0,0); if(id==="saved")renderSaved(); if(id==="packing")renderPacking()}
-$$("[data-go]").forEach(b=>b.onclick=()=>go(b.dataset.go));
+const saveDefaultBtn=$("#saveDefault");
+if(saveDefaultBtn)saveDefaultBtn.onclick=()=>{localStorage.setItem(KEY.defaults,JSON.stringify(data()));alert("いつもの条件として保存しました。");};
+const loadDefaultBtn=$("#loadDefault");
+if(loadDefaultBtn)loadDefaultBtn.onclick=()=>{const saved=JSON.parse(localStorage.getItem(KEY.defaults)||"null");if(!saved){alert("保存されている条件はまだありません。");return;}apply(saved);alert("いつもの条件を読み込みました。");};
 
-function pickPlans(cond){
- let history=JSON.parse(localStorage.getItem(KEY.history)||"[]").slice(-6);
- let recent=new Set(history.map(x=>x.title));
- let pool=templates.filter(x=>!recent.has(x.title) && x.cost<=Math.max(cond.budget,3000) && x.travel<=cond.maxTravel+10);
- if(pool.length<3) pool=templates.filter(x=>x.cost<=Math.max(cond.budget,3000));
- return pool.slice(0,3);
-}
 function renderPlans(plans=pickPlans(data())){
  $("#planCards").innerHTML=plans.map((p,i)=>`<article class="plan-card">
  <div class="plan-photo">${p.emoji}</div><div class="plan-body"><div class="plan-title"><b>${p.title}</b><span class="badge">${p.tag}</span></div>
@@ -63,30 +50,12 @@ function savePlan(){if(!selectedPlan)return; let a=JSON.parse(localStorage.getIt
 function renderSaved(){let a=JSON.parse(localStorage.getItem(KEY.saved)||"[]"); $("#savedPlans").innerHTML=a.length?a.map(p=>`<div class="plan-card"><div class="plan-body"><b>${p.emoji} ${p.title}</b><div class="meta"><span>¥${p.cost}</span><span>お得 ¥${p.saving}</span></div></div></div>`).join(""):"<p>まだ保存したプランはありません。</p>"}
 function packingItems(){
  let c=data(), hours=Math.max(1,(+c.endTime.slice(0,2)+c.endTime.slice(3)/60)-(+c.startTime.slice(0,2)+c.startTime.slice(3)/60));
- let items=[`おむつ（外出${Math.round(hours)}時間分＋予備）`,"おしりふき","着替え一式","飲み物","抱っこ紐 / ベビーカー"];
- if(c.milkEnabled){
-   const count=Math.max(1,Math.ceil(hours/Math.max(1,Number(c.milkInterval||4))));
-   items.push(`ミルク ${count}回分${c.milkAmount?`（1回 約${c.milkAmount}ml）`:""}`,"哺乳瓶・お湯");
- }
- if(c.napEnabled)items.push("昼寝用ブランケット / おくるみ");
- if(!c.indoor)items.push("帽子・日焼け/防寒対策");
- if(c.supermarket)items.push("買い物バッグ");
- return items;
+ let interval=+(JSON.parse(localStorage.getItem(KEY.profile)||"{}").milkInterval||4), milk=Math.ceil(hours/interval);
+ let items=[`おむつ（外出${Math.round(hours)}時間分＋予備）`,"おしりふき",`ミルク ${milk}回分`,"哺乳瓶・お湯","着替え一式","飲み物","抱っこ紐 / ベビーカー"];
+ if(!c.indoor)items.push("帽子・日焼け/防寒対策"); if(c.supermarket)items.push("買い物バッグ"); return items;
 }
-
 function renderPacking(){let items=packingItems(); $("#packingList").innerHTML=items.map((x,i)=>`<label class="packing-item"><input type="checkbox" class="pack"> ${x}</label>`).join(""); let upd=()=>{$("#packingProgress").textContent=`準備 ${$$(".pack:checked").length} / ${items.length}`}; $$(".pack").forEach(x=>x.onchange=upd);upd()}
 $("#conditionForm").onsubmit=async e=>{e.preventDefault();go("home");await generateAIPlansV12();};
-$("#saveDefault").onclick=()=>{
-  const d=data();
-  localStorage.setItem(KEY.defaults,JSON.stringify(d));
-  alert("いつもの条件として保存しました。");
-};
-$("#loadDefault").onclick=()=>{
-  const d=JSON.parse(localStorage.getItem(KEY.defaults)||"null");
-  if(!d)return;
-  apply(d);
-  alert("いつもの条件を読み込みました。");
-};
 $("#quickPlan").onclick=async()=>{let d=JSON.parse(localStorage.getItem(KEY.defaults)||"null");if(d)apply(d);await generateAIPlansV12();};
 $("#nowPlan").onclick=async()=>{let d=data();d.startPlace="現在地";apply(d);await generateAIPlansV12();};
 $("#saveProfile").onclick=()=>{let p={family:$("#family").value,milkInterval:$("#milkInterval").value,milkAmount:$("#milkAmount").value,napTime:$("#napTime").value};localStorage.setItem(KEY.profile,JSON.stringify(p));alert("プロフィールを保存しました。")};
@@ -1134,20 +1103,6 @@ async function loadRouteV15(place){
   }
 }
 
-function buildChildcareConditionsV19(){
-  const c=data();
-  return {
-    childAgeText:String(c.childAge||""),
-    milkEnabled:c.milkEnabled===true,
-    milkInterval:Number(c.milkInterval||4),
-    milkAmount:Number(c.milkAmount||0),
-    napEnabled:c.napEnabled===true,
-    napStart:String(c.napStart||"13:00"),
-    napEnd:String(c.napEnd||"14:30"),
-    childPace:String(c.childPace||"normal")
-  };
-}
-
 async function generateDayPlanV14(mainSpot){
   const box=$("#dayPlanV14Box");
   const button=$("#makeDayPlanV14");
@@ -1238,8 +1193,11 @@ if (!currentPosition) {
           returnTime:data()?.endTime||"17:00",
           lunchWanted:data()?.lunch===true,
           supermarketWanted:data()?.supermarket===true,
+          babyMilkEnabled:data()?.babyMilkEnabled===true,babyMilkInterval:Number(data()?.babyMilkInterval||4),
+          babyMilkAmount:Number(data()?.babyMilkAmount||200),babyNapEnabled:data()?.babyNapEnabled===true,
+          babyNapStart:String(data()?.babyNapStart||"13:00"),babyNapEnd:String(data()?.babyNapEnd||"14:30"),
+          babyChildPace:String(data()?.babyChildPace||"normal"),
           supermarket:data()?.supermarket===true,
-          ...buildChildcareConditionsV19(),
           requestType:"selected_main_place_day_plan",
           note:"mainPlaceIdの施設をメイン候補として優先し、無理のない1日プランを作る"
         }
@@ -1253,25 +1211,13 @@ if (!currentPosition) {
 
     const plan=result.dayPlan||{};
     let timeline=Array.isArray(plan.timeline)?[...plan.timeline]:[];
-    const childcareSchedule=Array.isArray(plan.childcareSchedule)?plan.childcareSchedule:[];
-    if(childcareSchedule.length){
-      const existing=new Set(timeline.map(x=>`${x?.type||""}|${x?.time||""}|${x?.title||""}`));
-      for(const item of childcareSchedule){
-        const key=`${item?.type||""}|${item?.time||""}|${item?.title||""}`;
-        if(!existing.has(key)){ timeline.push(item); existing.add(key); }
-      }
-      const toMinutes=s=>{
-        const m=String(s||"").match(/^(\d{1,2}):(\d{2})$/);
-        return m?Number(m[1])*60+Number(m[2]):null;
-      };
-      timeline.sort((a,b)=>{
-        const am=toMinutes(a?.time),bm=toMinutes(b?.time);
-        if(am==null&&bm==null)return 0;
-        if(am==null)return -1;
-        if(bm==null)return 1;
-        return am-bm;
-      });
-    }
+    const baby=data(),toMinBaby=s=>{const m=String(s||"").match(/^(\d{1,2}):(\d{2})$/);return m?Number(m[1])*60+Number(m[2]):null};
+    const fmtBaby=n=>`${String(Math.floor(n/60)%24).padStart(2,"0")}:${String(n%60).padStart(2,"0")}`;
+    const startBaby=toMinBaby(baby.startTime),returnBaby=toMinBaby(baby.endTime);
+    if(baby.babyChildPace==="relaxed")timeline.push({time:baby.startTime||"",type:"pace",title:"ゆったりペース",note:"移動・食事・おむつ替えに余裕を持つ設定です。"});
+    if(baby.babyNapEnabled&&baby.babyNapStart)timeline.push({time:baby.babyNapStart,type:"nap",title:"お昼寝タイム",note:`${baby.babyNapStart}〜${baby.babyNapEnd}を目安に休憩できる余裕を確保。`});
+    if(baby.babyMilkEnabled&&startBaby!=null&&returnBaby!=null){const interval=Math.max(60,Number(baby.babyMilkInterval||4)*60);for(let t=startBaby+interval;t<=returnBaby;t+=interval)timeline.push({time:fmtBaby(t),type:"milk",title:"ミルク・授乳の目安",note:`目安 約${Number(baby.babyMilkAmount||0)}ml。赤ちゃんの様子を優先してください。`});}
+    timeline.sort((a,b)=>{const am=toMinBaby(a?.time),bm=toMinBaby(b?.time);if(am==null&&bm==null)return 0;if(am==null)return -1;if(bm==null)return 1;return am-bm;});
    const routes = plan.routes || {};
 
 const homeToMain = routes.homeToMain || null;
@@ -1290,7 +1236,7 @@ const requestedReturnTime =
 
 const shortenedForReturnTime =
   plan.shortenedForReturnTime === true;
-    const icon=t=>t==="departure"?"🏠":t==="spot"?"📍":t==="lunch"?"🍴":t==="shopping"?"🛒":t==="milk"?"🍼":t==="nap"?"😴":t==="pace"?"👶":t==="baby"?"👶":t==="return"?"🏠":"🕒";
+    const icon=t=>t==="departure"?"🏠":t==="spot"?"📍":t==="lunch"?"🍴":t==="shopping"?"🛒":t==="milk"?"🍼":t==="nap"?"😴":t==="pace"?"👶":t==="return"?"🏠":"🕒";
 
     const rows=timeline.length?timeline.map(item=>`
       <div style="display:grid;grid-template-columns:58px 30px 1fr;gap:6px;align-items:start;padding:10px 0;border-bottom:1px solid rgba(0,0,0,.08);">
