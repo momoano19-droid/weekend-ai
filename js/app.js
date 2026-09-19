@@ -39,16 +39,42 @@ function data(){
     childPace: $("#childPace")?.value || "standard"
   };
 }
-function apply(d){if(!d)return; Object.entries(d).forEach(([k,v])=>{let e=$("#"+k); if(e) e.type==="checkbox"?e.checked=v:e.value=v})}
-function go(id){$$(".screen").forEach(x=>x.classList.toggle("active",x.id===id)); $$(".bottomnav button").forEach(x=>x.classList.toggle("active",x.dataset.go===id)); scrollTo(0,0); if(id==="saved")renderSaved(); if(id==="packing")renderPacking()}
-$$("[data-go]").forEach(b=>b.onclick=()=>go(b.dataset.go));
+function apply(d){
+  Object.entries(d || {}).forEach(([k, v]) => {
+    let el = $("#" + k);
+    if (!el) return;
 
-function pickPlans(cond){
- let history=JSON.parse(localStorage.getItem(KEY.history)||"[]").slice(-6);
- let recent=new Set(history.map(x=>x.title));
- let pool=templates.filter(x=>!recent.has(x.title) && x.cost<=Math.max(cond.budget,3000) && x.travel<=cond.maxTravel+10);
- if(pool.length<3) pool=templates.filter(x=>x.cost<=Math.max(cond.budget,3000));
- return pool.slice(0,3);
+    if (el.type === "checkbox") {
+      el.checked = !!v;
+    } else {
+      el.value = v ?? "";
+    }
+  });
+
+  // v1.9 子どもの生活リズム
+  if ($("#milkEnabled")) {
+    $("#milkEnabled").checked = !!d?.milkEnabled;
+  }
+
+  if ($("#milkInterval")) {
+    $("#milkInterval").value = d?.milkInterval ?? 3;
+  }
+
+  if ($("#napEnabled")) {
+    $("#napEnabled").checked = !!d?.napEnabled;
+  }
+
+  if ($("#napStart")) {
+    $("#napStart").value = d?.napStart || "13:00";
+  }
+
+  if ($("#napEnd")) {
+    $("#napEnd").value = d?.napEnd || "14:00";
+  }
+
+  if ($("#childPace")) {
+    $("#childPace").value = d?.childPace || "standard";
+  }
 }
 function renderPlans(plans=pickPlans(data())){
  $("#planCards").innerHTML=plans.map((p,i)=>`<article class="plan-card">
