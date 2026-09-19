@@ -12,11 +12,18 @@ const templates=[
  {tag:"近場でゆったり",title:"公園＋ベーカリー",emoji:"🌳",cost:2800,saving:650,travel:20,highway:0,return:"15:50",stops:["自宅を出発","大型公園","人気ベーカリー","買い物","帰宅"]}
 ];
 
-function data(){return {
- startPlace:$("#startPlace").value,endPlace:$("#endPlace").value,startTime:$("#startTime").value,endTime:$("#endTime").value,
- budget:+$("#budget").value,maxTravel:+$("#maxTravel").value,childAge:$("#childAge").value,highway:$("#highway").checked,
- indoor:$("#indoor").checked,lunch:$("#lunch").checked,supermarket:$("#supermarket").checked
-}}
+function data(){
+ const val=(id,fallback="")=>$(id)?.value ?? fallback;
+ const checked=(id,fallback=false)=>$(id)?$(id).checked:fallback;
+ return {
+  startPlace:val("#startPlace"),endPlace:val("#endPlace"),startTime:val("#startTime"),endTime:val("#endTime"),
+  budget:+val("#budget",0),maxTravel:+val("#maxTravel",0),childAge:val("#childAge"),highway:checked("#highway"),
+  indoor:checked("#indoor"),lunch:checked("#lunch"),supermarket:checked("#supermarket"),
+  milkEnabled:checked("#milkEnabled"),milkInterval:+val("#milkInterval",4)||4,milkAmount:+val("#milkAmount",0)||0,
+  napEnabled:checked("#napEnabled"),napStart:val("#napStart","13:00"),napEnd:val("#napEnd","14:30"),
+  childPace:val("#childPace","normal")
+ };
+}
 function apply(d){if(!d)return; Object.entries(d).forEach(([k,v])=>{let e=$("#"+k); if(e) e.type==="checkbox"?e.checked=v:e.value=v})}
 function go(id){$$(".screen").forEach(x=>x.classList.toggle("active",x.id===id)); $$(".bottomnav button").forEach(x=>x.classList.toggle("active",x.dataset.go===id)); scrollTo(0,0); if(id==="saved")renderSaved(); if(id==="packing")renderPacking()}
 $$("[data-go]").forEach(b=>b.onclick=()=>go(b.dataset.go));
@@ -48,10 +55,17 @@ function savePlan(){if(!selectedPlan)return; let a=JSON.parse(localStorage.getIt
 function renderSaved(){let a=JSON.parse(localStorage.getItem(KEY.saved)||"[]"); $("#savedPlans").innerHTML=a.length?a.map(p=>`<div class="plan-card"><div class="plan-body"><b>${p.emoji} ${p.title}</b><div class="meta"><span>¥${p.cost}</span><span>お得 ¥${p.saving}</span></div></div></div>`).join(""):"<p>まだ保存したプランはありません。</p>"}
 function packingItems(){
  let c=data(), hours=Math.max(1,(+c.endTime.slice(0,2)+c.endTime.slice(3)/60)-(+c.startTime.slice(0,2)+c.startTime.slice(3)/60));
- let interval=+(JSON.parse(localStorage.getItem(KEY.profile)||"{}").milkInterval||4), milk=Math.ceil(hours/interval);
- let items=[`おむつ（外出${Math.round(hours)}時間分＋予備）`,"おしりふき",`ミルク ${milk}回分`,"哺乳瓶・お湯","着替え一式","飲み物","抱っこ紐 / ベビーカー"];
- if(!c.indoor)items.push("帽子・日焼け/防寒対策"); if(c.supermarket)items.push("買い物バッグ"); return items;
+ let items=[`おむつ（外出${Math.round(hours)}時間分＋予備）`,"おしりふき","着替え一式","飲み物","抱っこ紐 / ベビーカー"];
+ if(c.milkEnabled){
+   const count=Math.max(1,Math.ceil(hours/Math.max(1,Number(c.milkInterval||4))));
+   items.push(`ミルク ${count}回分${c.milkAmount?`（1回 約${c.milkAmount}ml）`:""}`,"哺乳瓶・お湯");
+ }
+ if(c.napEnabled)items.push("昼寝用ブランケット / おくるみ");
+ if(!c.indoor)items.push("帽子・日焼け/防寒対策");
+ if(c.supermarket)items.push("買い物バッグ");
+ return items;
 }
+
 function renderPacking(){let items=packingItems(); $("#packingList").innerHTML=items.map((x,i)=>`<label class="packing-item"><input type="checkbox" class="pack"> ${x}</label>`).join(""); let upd=()=>{$("#packingProgress").textContent=`準備 ${$$(".pack:checked").length} / ${items.length}`}; $$(".pack").forEach(x=>x.onchange=upd);upd()}
 $("#conditionForm").onsubmit=async e=>{e.preventDefault();go("home");await generateAIPlansV12();};
 $("#saveDefault").onclick=()=>{localStorage.setItem(KEY.defaults,JSON.stringify(data()));alert("いつもの条件として保存しました。")};
@@ -1194,6 +1208,14 @@ if (!currentPosition) {
           lunchWanted:data()?.lunch===true,
           supermarketWanted:data()?.supermarket===true,
           supermarket:data()?.supermarket===true,
+          childAgeText:String(data()?.childAge||""),
+          milkEnabled:data()?.milkEnabled===true,
+          milkInterval:Number(data()?.milkInterval||4),
+          milkAmount:Number(data()?.milkAmount||0),
+          napEnabled:data()?.napEnabled===true,
+          napStart:String(data()?.napStart||"13:00"),
+          napEnd:String(data()?.napEnd||"14:30"),
+          childPace:String(data()?.childPace||"normal"),
           requestType:"selected_main_place_day_plan",
           note:"mainPlaceIdの施設をメイン候補として優先し、無理のない1日プランを作る"
         }

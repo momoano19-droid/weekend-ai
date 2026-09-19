@@ -39,7 +39,6 @@
     <div><small class="eyebrow">FOR YOUR FAMILY</small><h2>今日のおすすめ 3プラン</h2></div>
     <button class="linkbtn condition-chip" data-go="settings">⚙️ 条件を変える</button>
   </div>
-  <div id="aiPlanStatus" class="spot-status">実在スポット取得後にAIで3プランを作れます</div>
   <div id="planCards" class="cards home-plan-cards"></div>
   <section class="nearby-section">
     <div class="section-head">
@@ -47,7 +46,7 @@
       <span id="spotStatus" class="spot-status">現在地取得後に検索できます</span>
     </div>
     <div id="realSpotCards" class="real-spot-cards"></div>
-    <div class="osm-credit">施設候補データ：Google Places</div>
+    <div class="osm-credit">施設候補データ © OpenStreetMap contributors</div>
   </section>
 
   <div class="saving-card cute-saving">
@@ -71,6 +70,24 @@
       <label><input id="indoor" type="checkbox"> 屋内優先</label>
       <label><input id="lunch" type="checkbox" checked> ランチあり</label>
       <label><input id="supermarket" type="checkbox"> 帰りにスーパー</label>
+        <div class="form-card" style="margin-top:14px;">
+          <h3>👶 赤ちゃん向け設定</h3>
+          <label class="check-row"><input type="checkbox" id="milkEnabled"> 🍼 ミルク・授乳を考慮する</label>
+          <div class="form-grid" style="margin-top:10px;">
+            <label>ミルク間隔
+              <select id="milkInterval"><option value="2">2時間</option><option value="3">3時間</option><option value="4" selected>4時間</option><option value="5">5時間</option></select>
+            </label>
+            <label>1回の量 <input id="milkAmount" type="number" min="0" step="10" value="200" inputmode="numeric"> ml</label>
+          </div>
+          <label class="check-row" style="margin-top:12px;"><input type="checkbox" id="napEnabled"> 😴 お昼寝を考慮する</label>
+          <div class="form-grid" style="margin-top:10px;">
+            <label>昼寝開始 <input id="napStart" type="time" value="13:00"></label>
+            <label>昼寝終了 <input id="napEnd" type="time" value="14:30"></label>
+          </div>
+          <label style="display:block;margin-top:12px;">子どものペース
+            <select id="childPace"><option value="relaxed">ゆったり</option><option value="normal" selected>ふつう</option><option value="active">しっかり遊ぶ</option></select>
+          </label>
+        </div>
     </div>
     <div class="form-actions">
       <button type="button" class="secondary" id="saveDefault">この条件をデフォルト保存</button>
