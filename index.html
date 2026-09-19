@@ -71,44 +71,6 @@
       <label><input id="indoor" type="checkbox"> 屋内優先</label>
       <label><input id="lunch" type="checkbox" checked> ランチあり</label>
       <label><input id="supermarket" type="checkbox"> 帰りにスーパー</label>
-      <div class="child-rhythm-settings">
-  <div style="margin-top:16px;font-weight:700;">👶 子どもの生活リズム</div>
-
-  <label style="display:block;margin-top:10px;">
-    <input id="milkEnabled" type="checkbox">
-    🍼 ミルク・授乳を考慮
-  </label>
-
-  <label style="display:block;margin-top:8px;">
-    ミルク・授乳の間隔
-    <select id="milkInterval">
-      <option value="2">約2時間おき</option>
-      <option value="3" selected>約3時間おき</option>
-      <option value="4">約4時間おき</option>
-      <option value="5">約5時間おき</option>
-    </select>
-  </label>
-
-  <label style="display:block;margin-top:10px;">
-    <input id="napEnabled" type="checkbox">
-    😴 お昼寝を考慮
-  </label>
-
-  <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
-    <input id="napStart" type="time" value="13:00">
-    <span>〜</span>
-    <input id="napEnd" type="time" value="14:00">
-  </div>
-
-  <label style="display:block;margin-top:10px;">
-    👶 子ども優先度
-    <select id="childPace">
-      <option value="relaxed">ゆったり</option>
-      <option value="standard" selected>標準</option>
-      <option value="active">しっかり遊ぶ</option>
-    </select>
-  </label>
-</div>
     </div>
     <div class="form-actions">
       <button type="button" class="secondary" id="saveDefault">この条件をデフォルト保存</button>
