@@ -12,69 +12,21 @@ const templates=[
  {tag:"近場でゆったり",title:"公園＋ベーカリー",emoji:"🌳",cost:2800,saving:650,travel:20,highway:0,return:"15:50",stops:["自宅を出発","大型公園","人気ベーカリー","買い物","帰宅"]}
 ];
 
-function data(){
-  return {
-    startPlace: $("#startPlace").value,
-    endPlace: $("#endPlace").value,
-    startTime: $("#startTime").value,
-    endTime: $("#endTime").value,
+function data(){return {
+ startPlace:$("#startPlace").value,endPlace:$("#endPlace").value,startTime:$("#startTime").value,endTime:$("#endTime").value,
+ budget:+$("#budget").value,maxTravel:+$("#maxTravel").value,childAge:$("#childAge").value,highway:$("#highway").checked,
+ indoor:$("#indoor").checked,lunch:$("#lunch").checked,supermarket:$("#supermarket").checked
+}}
+function apply(d){if(!d)return; Object.entries(d).forEach(([k,v])=>{let e=$("#"+k); if(e) e.type==="checkbox"?e.checked=v:e.value=v})}
+function go(id){$$(".screen").forEach(x=>x.classList.toggle("active",x.id===id)); $$(".bottomnav button").forEach(x=>x.classList.toggle("active",x.dataset.go===id)); scrollTo(0,0); if(id==="saved")renderSaved(); if(id==="packing")renderPacking()}
+$$("[data-go]").forEach(b=>b.onclick=()=>go(b.dataset.go));
 
-    budget: +$("#budget").value,
-    maxTravel: +$("#maxTravel").value,
-    childAge: $("#childAge").value,
-
-    highway: $("#highway").checked,
-    lunch: $("#lunch").checked,
-    indoor: $("#indoor").checked,
-    supermarket: $("#supermarket").checked,
-
-    // v1.9 子どもの生活リズム
-    milkEnabled: $("#milkEnabled")?.checked || false,
-    milkInterval: +($("#milkInterval")?.value || 3),
-
-    napEnabled: $("#napEnabled")?.checked || false,
-    napStart: $("#napStart")?.value || "13:00",
-    napEnd: $("#napEnd")?.value || "14:00",
-
-    childPace: $("#childPace")?.value || "standard"
-  };
-}
-function apply(d){
-  Object.entries(d || {}).forEach(([k, v]) => {
-    let el = $("#" + k);
-    if (!el) return;
-
-    if (el.type === "checkbox") {
-      el.checked = !!v;
-    } else {
-      el.value = v ?? "";
-    }
-  });
-
-  // v1.9 子どもの生活リズム
-  if ($("#milkEnabled")) {
-    $("#milkEnabled").checked = !!d?.milkEnabled;
-  }
-
-  if ($("#milkInterval")) {
-    $("#milkInterval").value = d?.milkInterval ?? 3;
-  }
-
-  if ($("#napEnabled")) {
-    $("#napEnabled").checked = !!d?.napEnabled;
-  }
-
-  if ($("#napStart")) {
-    $("#napStart").value = d?.napStart || "13:00";
-  }
-
-  if ($("#napEnd")) {
-    $("#napEnd").value = d?.napEnd || "14:00";
-  }
-
-  if ($("#childPace")) {
-    $("#childPace").value = d?.childPace || "standard";
-  }
+function pickPlans(cond){
+ let history=JSON.parse(localStorage.getItem(KEY.history)||"[]").slice(-6);
+ let recent=new Set(history.map(x=>x.title));
+ let pool=templates.filter(x=>!recent.has(x.title) && x.cost<=Math.max(cond.budget,3000) && x.travel<=cond.maxTravel+10);
+ if(pool.length<3) pool=templates.filter(x=>x.cost<=Math.max(cond.budget,3000));
+ return pool.slice(0,3);
 }
 function renderPlans(plans=pickPlans(data())){
  $("#planCards").innerHTML=plans.map((p,i)=>`<article class="plan-card">
@@ -1234,26 +1186,13 @@ if (!currentPosition) {
 
        mainPlaceId: String(mainSpot?.id || ""),
        
-        conditions: {
-  mainPlaceId: mainSpot?.id || "",
-  mainPlaceName: mainSpot?.name || "",
-
-  // v1.8 帰り道スーパー
-  supermarketWanted: data()?.supermarket === true,
-
-  // v1.9 子どもの生活リズム
-  milkEnabled: data()?.milkEnabled === true,
-  milkInterval: Number(data()?.milkInterval || 3),
-
-  napEnabled: data()?.napEnabled === true,
-  napStart: data()?.napStart || "13:00",
-  napEnd: data()?.napEnd || "14:00",
-
-  childPace: data()?.childPace || "standard",
-
-  requestType: "selected_main_place_day_plan",
-  note: "mainPlaceIdの施設をメイン候補として優先し、子どものミルク・昼寝・過ごすペースを考慮して無理のない1日プランを作る"
-}
+        conditions:{
+          mainPlaceId:mainSpot?.id||"",
+          mainPlaceName:mainSpot?.name||"",
+          supermarketWanted: data()?.supermarket === true,
+          requestType:"selected_main_place_day_plan",
+          note:"mainPlaceIdの施設をメイン候補として優先し、無理のない1日プランを作る"
+        }
       })
     });
 
