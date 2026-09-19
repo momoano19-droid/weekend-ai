@@ -1234,13 +1234,26 @@ if (!currentPosition) {
 
        mainPlaceId: String(mainSpot?.id || ""),
        
-        conditions:{
-          mainPlaceId:mainSpot?.id||"",
-          mainPlaceName:mainSpot?.name||"",
-          supermarketWanted: data()?.supermarket === true,
-          requestType:"selected_main_place_day_plan",
-          note:"mainPlaceIdの施設をメイン候補として優先し、無理のない1日プランを作る"
-        }
+        conditions: {
+  mainPlaceId: mainSpot?.id || "",
+  mainPlaceName: mainSpot?.name || "",
+
+  // v1.8 帰り道スーパー
+  supermarketWanted: data()?.supermarket === true,
+
+  // v1.9 子どもの生活リズム
+  milkEnabled: data()?.milkEnabled === true,
+  milkInterval: Number(data()?.milkInterval || 3),
+
+  napEnabled: data()?.napEnabled === true,
+  napStart: data()?.napStart || "13:00",
+  napEnd: data()?.napEnd || "14:00",
+
+  childPace: data()?.childPace || "standard",
+
+  requestType: "selected_main_place_day_plan",
+  note: "mainPlaceIdの施設をメイン候補として優先し、子どものミルク・昼寝・過ごすペースを考慮して無理のない1日プランを作る"
+}
       })
     });
 
