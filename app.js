@@ -24,7 +24,15 @@ function data(){
   childPace:val("#childPace","normal")
  };
 }
-function apply(d){if(!d)return; Object.entries(d).forEach(([k,v])=>{let e=$("#"+k); if(e) e.type==="checkbox"?e.checked=v:e.value=v})}
+function apply(d){
+ if(!d)return;
+ Object.entries(d).forEach(([k,v])=>{
+   const e=$("#"+k);
+   if(!e)return;
+   if(e.type==="checkbox") e.checked=Boolean(v);
+   else e.value=v ?? "";
+ });
+}
 function go(id){$$(".screen").forEach(x=>x.classList.toggle("active",x.id===id)); $$(".bottomnav button").forEach(x=>x.classList.toggle("active",x.dataset.go===id)); scrollTo(0,0); if(id==="saved")renderSaved(); if(id==="packing")renderPacking()}
 $$("[data-go]").forEach(b=>b.onclick=()=>go(b.dataset.go));
 
@@ -68,8 +76,17 @@ function packingItems(){
 
 function renderPacking(){let items=packingItems(); $("#packingList").innerHTML=items.map((x,i)=>`<label class="packing-item"><input type="checkbox" class="pack"> ${x}</label>`).join(""); let upd=()=>{$("#packingProgress").textContent=`準備 ${$$(".pack:checked").length} / ${items.length}`}; $$(".pack").forEach(x=>x.onchange=upd);upd()}
 $("#conditionForm").onsubmit=async e=>{e.preventDefault();go("home");await generateAIPlansV12();};
-$("#saveDefault").onclick=()=>{localStorage.setItem(KEY.defaults,JSON.stringify(data()));alert("いつもの条件として保存しました。")};
-$("#loadDefault").onclick=()=>apply(JSON.parse(localStorage.getItem(KEY.defaults)||"null"));
+$("#saveDefault").onclick=()=>{
+  const d=data();
+  localStorage.setItem(KEY.defaults,JSON.stringify(d));
+  alert("いつもの条件として保存しました。");
+};
+$("#loadDefault").onclick=()=>{
+  const d=JSON.parse(localStorage.getItem(KEY.defaults)||"null");
+  if(!d)return;
+  apply(d);
+  alert("いつもの条件を読み込みました。");
+};
 $("#quickPlan").onclick=async()=>{let d=JSON.parse(localStorage.getItem(KEY.defaults)||"null");if(d)apply(d);await generateAIPlansV12();};
 $("#nowPlan").onclick=async()=>{let d=data();d.startPlace="現在地";apply(d);await generateAIPlansV12();};
 $("#saveProfile").onclick=()=>{let p={family:$("#family").value,milkInterval:$("#milkInterval").value,milkAmount:$("#milkAmount").value,napTime:$("#napTime").value};localStorage.setItem(KEY.profile,JSON.stringify(p));alert("プロフィールを保存しました。")};
@@ -1117,6 +1134,20 @@ async function loadRouteV15(place){
   }
 }
 
+function buildChildcareConditionsV19(){
+  const c=data();
+  return {
+    childAgeText:String(c.childAge||""),
+    milkEnabled:c.milkEnabled===true,
+    milkInterval:Number(c.milkInterval||4),
+    milkAmount:Number(c.milkAmount||0),
+    napEnabled:c.napEnabled===true,
+    napStart:String(c.napStart||"13:00"),
+    napEnd:String(c.napEnd||"14:30"),
+    childPace:String(c.childPace||"normal")
+  };
+}
+
 async function generateDayPlanV14(mainSpot){
   const box=$("#dayPlanV14Box");
   const button=$("#makeDayPlanV14");
@@ -1208,14 +1239,7 @@ if (!currentPosition) {
           lunchWanted:data()?.lunch===true,
           supermarketWanted:data()?.supermarket===true,
           supermarket:data()?.supermarket===true,
-          childAgeText:String(data()?.childAge||""),
-          milkEnabled:data()?.milkEnabled===true,
-          milkInterval:Number(data()?.milkInterval||4),
-          milkAmount:Number(data()?.milkAmount||0),
-          napEnabled:data()?.napEnabled===true,
-          napStart:String(data()?.napStart||"13:00"),
-          napEnd:String(data()?.napEnd||"14:30"),
-          childPace:String(data()?.childPace||"normal"),
+          ...buildChildcareConditionsV19(),
           requestType:"selected_main_place_day_plan",
           note:"mainPlaceIdの施設をメイン候補として優先し、無理のない1日プランを作る"
         }
@@ -1228,7 +1252,26 @@ if (!currentPosition) {
     }
 
     const plan=result.dayPlan||{};
-    const timeline=Array.isArray(plan.timeline)?plan.timeline:[];
+    let timeline=Array.isArray(plan.timeline)?[...plan.timeline]:[];
+    const childcareSchedule=Array.isArray(plan.childcareSchedule)?plan.childcareSchedule:[];
+    if(childcareSchedule.length){
+      const existing=new Set(timeline.map(x=>`${x?.type||""}|${x?.time||""}|${x?.title||""}`));
+      for(const item of childcareSchedule){
+        const key=`${item?.type||""}|${item?.time||""}|${item?.title||""}`;
+        if(!existing.has(key)){ timeline.push(item); existing.add(key); }
+      }
+      const toMinutes=s=>{
+        const m=String(s||"").match(/^(\d{1,2}):(\d{2})$/);
+        return m?Number(m[1])*60+Number(m[2]):null;
+      };
+      timeline.sort((a,b)=>{
+        const am=toMinutes(a?.time),bm=toMinutes(b?.time);
+        if(am==null&&bm==null)return 0;
+        if(am==null)return -1;
+        if(bm==null)return 1;
+        return am-bm;
+      });
+    }
    const routes = plan.routes || {};
 
 const homeToMain = routes.homeToMain || null;
@@ -1247,7 +1290,7 @@ const requestedReturnTime =
 
 const shortenedForReturnTime =
   plan.shortenedForReturnTime === true;
-    const icon=t=>t==="departure"?"🏠":t==="spot"?"📍":t==="lunch"?"🍴":t==="shopping"?"🛒":t==="return"?"🏠":"🕒";
+    const icon=t=>t==="departure"?"🏠":t==="spot"?"📍":t==="lunch"?"🍴":t==="shopping"?"🛒":t==="milk"?"🍼":t==="nap"?"😴":t==="pace"?"👶":t==="baby"?"👶":t==="return"?"🏠":"🕒";
 
     const rows=timeline.length?timeline.map(item=>`
       <div style="display:grid;grid-template-columns:58px 30px 1fr;gap:6px;align-items:start;padding:10px 0;border-bottom:1px solid rgba(0,0,0,.08);">
