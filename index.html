@@ -72,20 +72,20 @@
       <label><input id="supermarket" type="checkbox"> 帰りにスーパー</label>
         <div class="form-card" style="margin-top:14px;">
           <h3>👶 赤ちゃん向け設定</h3>
-          <label class="check-row"><input type="checkbox" id="milkEnabled"> 🍼 ミルク・授乳を考慮する</label>
+          <label class="check-row"><input type="checkbox" id="babyMilkEnabled"> 🍼 ミルク・授乳を考慮する</label>
           <div class="form-grid" style="margin-top:10px;">
             <label>ミルク間隔
-              <select id="milkInterval"><option value="2">2時間</option><option value="3">3時間</option><option value="4" selected>4時間</option><option value="5">5時間</option></select>
+              <select id="babyMilkInterval"><option value="2">2時間</option><option value="3">3時間</option><option value="4" selected>4時間</option><option value="5">5時間</option></select>
             </label>
-            <label>1回の量 <input id="milkAmount" type="number" min="0" step="10" value="200" inputmode="numeric"> ml</label>
+            <label>1回の量 <input id="babyMilkAmount" type="number" min="0" step="10" value="200" inputmode="numeric"> ml</label>
           </div>
-          <label class="check-row" style="margin-top:12px;"><input type="checkbox" id="napEnabled"> 😴 お昼寝を考慮する</label>
+          <label class="check-row" style="margin-top:12px;"><input type="checkbox" id="babyNapEnabled"> 😴 お昼寝を考慮する</label>
           <div class="form-grid" style="margin-top:10px;">
-            <label>昼寝開始 <input id="napStart" type="time" value="13:00"></label>
-            <label>昼寝終了 <input id="napEnd" type="time" value="14:30"></label>
+            <label>昼寝開始 <input id="babyNapStart" type="time" value="13:00"></label>
+            <label>昼寝終了 <input id="babyNapEnd" type="time" value="14:30"></label>
           </div>
           <label style="display:block;margin-top:12px;">子どものペース
-            <select id="childPace"><option value="relaxed">ゆったり</option><option value="normal" selected>ふつう</option><option value="active">しっかり遊ぶ</option></select>
+            <select id="babyChildPace"><option value="relaxed">ゆったり</option><option value="normal" selected>ふつう</option><option value="active">しっかり遊ぶ</option></select>
           </label>
         </div>
     </div>
