@@ -133,4 +133,53 @@
 </nav>
 </div>
 <script src="js/app.js"></script>
+
+<script>
+(function(){
+  const KEY_DEFAULTS="weekend_ai_defaults_v1";
+  const ids=[
+    "startPlace","endPlace","startTime","endTime","budget","maxTravel","childAge",
+    "highway","indoor","lunch","supermarket",
+    "babyMilkEnabled","babyMilkInterval","babyMilkAmount",
+    "babyNapEnabled","babyNapStart","babyNapEnd","babyChildPace"
+  ];
+  function collect(){
+    const d={};
+    ids.forEach(id=>{
+      const e=document.getElementById(id);
+      if(!e)return;
+      d[id]=e.type==="checkbox"?e.checked:e.value;
+    });
+    return d;
+  }
+  function restore(d){
+    if(!d)return;
+    ids.forEach(id=>{
+      const e=document.getElementById(id);
+      if(!e || !(id in d))return;
+      if(e.type==="checkbox")e.checked=Boolean(d[id]);
+      else e.value=d[id] ?? "";
+    });
+  }
+  window.weekendSaveDefaults=function(){
+    try{
+      localStorage.setItem(KEY_DEFAULTS,JSON.stringify(collect()));
+      alert("いつもの条件として保存しました。");
+    }catch(err){alert("条件を保存できませんでした。");}
+  };
+  window.weekendLoadDefaults=function(){
+    try{
+      const raw=localStorage.getItem(KEY_DEFAULTS);
+      if(!raw){alert("保存されている条件はまだありません。");return;}
+      restore(JSON.parse(raw));
+      alert("いつもの条件を読み込みました。");
+    }catch(err){alert("保存した条件を読み込めませんでした。");}
+  };
+  const save=document.getElementById("saveDefault");
+  const load=document.getElementById("loadDefault");
+  if(save) save.onclick=window.weekendSaveDefaults;
+  if(load) load.onclick=window.weekendLoadDefaults;
+})();
+</script>
+
 </body></html>
