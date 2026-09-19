@@ -1189,6 +1189,7 @@ if (!currentPosition) {
         conditions:{
           mainPlaceId:mainSpot?.id||"",
           mainPlaceName:mainSpot?.name||"",
+          supermarketWanted: data()?.supermarket === true,
           requestType:"selected_main_place_day_plan",
           note:"mainPlaceIdの施設をメイン候補として優先し、無理のない1日プランを作る"
         }
