@@ -132,7 +132,7 @@
 <button data-go="mypage">👤<span>マイページ</span></button>
 </nav>
 </div>
-<script src="js/app.js?v=1.9.6"></script>
+<script src="js/app.js?v=1.9.6-final"></script>
 
 <script>
 (function(){
@@ -179,6 +179,27 @@
   const load=document.getElementById("loadDefault");
   if(save) save.onclick=window.weekendSaveDefaults;
   if(load) load.onclick=window.weekendLoadDefaults;
+})();
+</script>
+
+
+<script>
+(function(){
+  function openScreen(id){
+    document.querySelectorAll(".screen").forEach(function(el){
+      el.classList.toggle("active", el.id===id);
+    });
+    document.querySelectorAll(".bottomnav button").forEach(function(el){
+      el.classList.toggle("active", el.dataset.go===id);
+    });
+    window.scrollTo(0,0);
+  }
+  document.querySelectorAll('[data-go="settings"]').forEach(function(btn){
+    btn.onclick=function(event){
+      event.preventDefault();
+      openScreen("settings");
+    };
+  });
 })();
 </script>
 
