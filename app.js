@@ -16,20 +16,25 @@ function data(){return {
  startPlace:$("#startPlace").value,endPlace:$("#endPlace").value,startTime:$("#startTime").value,endTime:$("#endTime").value,
  budget:+$("#budget").value,maxTravel:+$("#maxTravel").value,childAge:$("#childAge").value,highway:$("#highway").checked,
  indoor:$("#indoor").checked,lunch:$("#lunch").checked,supermarket:$("#supermarket").checked,
- babyMilkEnabled:$("#babyMilkEnabled")?.checked===true,babyMilkInterval:Number($("#babyMilkInterval")?.value||4),
- babyMilkAmount:Number($("#babyMilkAmount")?.value||200),babyNapEnabled:$("#babyNapEnabled")?.checked===true,
- babyNapStart:$("#babyNapStart")?.value||"13:00",babyNapEnd:$("#babyNapEnd")?.value||"14:30",
+ babyMilkEnabled:$("#babyMilkEnabled")?.checked===true,
+ babyMilkInterval:Number($("#babyMilkInterval")?.value||4),
+ babyMilkAmount:Number($("#babyMilkAmount")?.value||200),
+ babyNapEnabled:$("#babyNapEnabled")?.checked===true,
+ babyNapStart:$("#babyNapStart")?.value||"13:00",
+ babyNapEnd:$("#babyNapEnd")?.value||"14:30",
  babyChildPace:$("#babyChildPace")?.value||"normal"
 }}
-function apply(d){
- if(!d)return;
- Object.entries(d).forEach(([k,v])=>{const e=$("#"+k);if(!e)return;if(e.type==="checkbox")e.checked=Boolean(v);else e.value=v??"";});
-}
-const saveDefaultBtn=$("#saveDefault");
-if(saveDefaultBtn)saveDefaultBtn.onclick=()=>{localStorage.setItem(KEY.defaults,JSON.stringify(data()));alert("いつもの条件として保存しました。");};
-const loadDefaultBtn=$("#loadDefault");
-if(loadDefaultBtn)loadDefaultBtn.onclick=()=>{const saved=JSON.parse(localStorage.getItem(KEY.defaults)||"null");if(!saved){alert("保存されている条件はまだありません。");return;}apply(saved);alert("いつもの条件を読み込みました。");};
+function apply(d){if(!d)return; Object.entries(d).forEach(([k,v])=>{let e=$("#"+k); if(e) e.type==="checkbox"?e.checked=v:e.value=v})}
+function go(id){$$(".screen").forEach(x=>x.classList.toggle("active",x.id===id)); $$(".bottomnav button").forEach(x=>x.classList.toggle("active",x.dataset.go===id)); scrollTo(0,0); if(id==="saved")renderSaved(); if(id==="packing")renderPacking()}
+$$("[data-go]").forEach(b=>b.onclick=()=>go(b.dataset.go));
 
+function pickPlans(cond){
+ let history=JSON.parse(localStorage.getItem(KEY.history)||"[]").slice(-6);
+ let recent=new Set(history.map(x=>x.title));
+ let pool=templates.filter(x=>!recent.has(x.title) && x.cost<=Math.max(cond.budget,3000) && x.travel<=cond.maxTravel+10);
+ if(pool.length<3) pool=templates.filter(x=>x.cost<=Math.max(cond.budget,3000));
+ return pool.slice(0,3);
+}
 function renderPlans(plans=pickPlans(data())){
  $("#planCards").innerHTML=plans.map((p,i)=>`<article class="plan-card">
  <div class="plan-photo">${p.emoji}</div><div class="plan-body"><div class="plan-title"><b>${p.title}</b><span class="badge">${p.tag}</span></div>
@@ -56,6 +61,8 @@ function packingItems(){
 }
 function renderPacking(){let items=packingItems(); $("#packingList").innerHTML=items.map((x,i)=>`<label class="packing-item"><input type="checkbox" class="pack"> ${x}</label>`).join(""); let upd=()=>{$("#packingProgress").textContent=`準備 ${$$(".pack:checked").length} / ${items.length}`}; $$(".pack").forEach(x=>x.onchange=upd);upd()}
 $("#conditionForm").onsubmit=async e=>{e.preventDefault();go("home");await generateAIPlansV12();};
+$("#saveDefault").onclick=()=>{localStorage.setItem(KEY.defaults,JSON.stringify(data()));alert("いつもの条件として保存しました。")};
+$("#loadDefault").onclick=()=>apply(JSON.parse(localStorage.getItem(KEY.defaults)||"null"));
 $("#quickPlan").onclick=async()=>{let d=JSON.parse(localStorage.getItem(KEY.defaults)||"null");if(d)apply(d);await generateAIPlansV12();};
 $("#nowPlan").onclick=async()=>{let d=data();d.startPlace="現在地";apply(d);await generateAIPlansV12();};
 $("#saveProfile").onclick=()=>{let p={family:$("#family").value,milkInterval:$("#milkInterval").value,milkAmount:$("#milkAmount").value,napTime:$("#napTime").value};localStorage.setItem(KEY.profile,JSON.stringify(p));alert("プロフィールを保存しました。")};
@@ -1193,11 +1200,14 @@ if (!currentPosition) {
           returnTime:data()?.endTime||"17:00",
           lunchWanted:data()?.lunch===true,
           supermarketWanted:data()?.supermarket===true,
-          babyMilkEnabled:data()?.babyMilkEnabled===true,babyMilkInterval:Number(data()?.babyMilkInterval||4),
-          babyMilkAmount:Number(data()?.babyMilkAmount||200),babyNapEnabled:data()?.babyNapEnabled===true,
-          babyNapStart:String(data()?.babyNapStart||"13:00"),babyNapEnd:String(data()?.babyNapEnd||"14:30"),
-          babyChildPace:String(data()?.babyChildPace||"normal"),
           supermarket:data()?.supermarket===true,
+          babyMilkEnabled:data()?.babyMilkEnabled===true,
+          babyMilkInterval:Number(data()?.babyMilkInterval||4),
+          babyMilkAmount:Number(data()?.babyMilkAmount||200),
+          babyNapEnabled:data()?.babyNapEnabled===true,
+          babyNapStart:String(data()?.babyNapStart||"13:00"),
+          babyNapEnd:String(data()?.babyNapEnd||"14:30"),
+          babyChildPace:String(data()?.babyChildPace||"normal"),
           requestType:"selected_main_place_day_plan",
           note:"mainPlaceIdの施設をメイン候補として優先し、無理のない1日プランを作る"
         }
@@ -1211,13 +1221,58 @@ if (!currentPosition) {
 
     const plan=result.dayPlan||{};
     let timeline=Array.isArray(plan.timeline)?[...plan.timeline]:[];
-    const baby=data(),toMinBaby=s=>{const m=String(s||"").match(/^(\d{1,2}):(\d{2})$/);return m?Number(m[1])*60+Number(m[2]):null};
-    const fmtBaby=n=>`${String(Math.floor(n/60)%24).padStart(2,"0")}:${String(n%60).padStart(2,"0")}`;
-    const startBaby=toMinBaby(baby.startTime),returnBaby=toMinBaby(baby.endTime);
-    if(baby.babyChildPace==="relaxed")timeline.push({time:baby.startTime||"",type:"pace",title:"ゆったりペース",note:"移動・食事・おむつ替えに余裕を持つ設定です。"});
-    if(baby.babyNapEnabled&&baby.babyNapStart)timeline.push({time:baby.babyNapStart,type:"nap",title:"お昼寝タイム",note:`${baby.babyNapStart}〜${baby.babyNapEnd}を目安に休憩できる余裕を確保。`});
-    if(baby.babyMilkEnabled&&startBaby!=null&&returnBaby!=null){const interval=Math.max(60,Number(baby.babyMilkInterval||4)*60);for(let t=startBaby+interval;t<=returnBaby;t+=interval)timeline.push({time:fmtBaby(t),type:"milk",title:"ミルク・授乳の目安",note:`目安 約${Number(baby.babyMilkAmount||0)}ml。赤ちゃんの様子を優先してください。`});}
-    timeline.sort((a,b)=>{const am=toMinBaby(a?.time),bm=toMinBaby(b?.time);if(am==null&&bm==null)return 0;if(am==null)return -1;if(bm==null)return 1;return am-bm;});
+
+    // v1.9: 赤ちゃん設定を実際に表示するタイムラインへ追加
+    const baby=data();
+    const toMinutesBaby=(value)=>{
+      const m=String(value||"").match(/^(\\d{1,2}):(\\d{2})$/);
+      return m ? Number(m[1])*60+Number(m[2]) : null;
+    };
+    const formatMinutesBaby=(minutes)=>{
+      const n=((Math.round(minutes)%1440)+1440)%1440;
+      return `${String(Math.floor(n/60)).padStart(2,"0")}:${String(n%60).padStart(2,"0")}`;
+    };
+    const startBaby=toMinutesBaby(baby.startTime);
+    const returnBaby=toMinutesBaby(baby.endTime);
+
+    if(baby.babyChildPace==="relaxed"){
+      timeline.push({
+        time:baby.startTime||"",
+        type:"pace",
+        title:"ゆったりペース",
+        note:"移動・食事・おむつ替えに余裕を持つ設定です。"
+      });
+    }
+
+    if(baby.babyNapEnabled && baby.babyNapStart){
+      timeline.push({
+        time:baby.babyNapStart,
+        type:"nap",
+        title:"お昼寝タイム",
+        note:`${baby.babyNapStart}〜${baby.babyNapEnd}を目安に休憩できる余裕を確保。`
+      });
+    }
+
+    if(baby.babyMilkEnabled && startBaby!=null && returnBaby!=null){
+      const interval=Math.max(60,Number(baby.babyMilkInterval||4)*60);
+      for(let t=startBaby+interval;t<=returnBaby;t+=interval){
+        timeline.push({
+          time:formatMinutesBaby(t),
+          type:"milk",
+          title:"ミルク・授乳の目安",
+          note:`目安 約${Number(baby.babyMilkAmount||0)}ml。赤ちゃんの様子を優先してください。`
+        });
+      }
+    }
+
+    timeline.sort((a,b)=>{
+      const am=toMinutesBaby(a?.time), bm=toMinutesBaby(b?.time);
+      if(am==null&&bm==null)return 0;
+      if(am==null)return -1;
+      if(bm==null)return 1;
+      return am-bm;
+    });
+
    const routes = plan.routes || {};
 
 const homeToMain = routes.homeToMain || null;
