@@ -1255,7 +1255,7 @@ if (!currentPosition) {
 
     if(baby.babyMilkEnabled && startBaby!=null && returnBaby!=null){
       const interval=Math.max(60,Number(baby.babyMilkInterval||4)*60);
-      for(let t=startBaby+interval;t<=returnBaby;t+=interval){
+      for(let t=start+interval;t<=returnBaby;t+=interval){
         timeline.push({
           time:formatMinutesBaby(t),
           type:"milk",
