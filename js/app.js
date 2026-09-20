@@ -668,7 +668,8 @@ async function testGoogleV09() {
     const apiUrl =
       `${WEEKEND_AI_API}/spots-v09` +
       `?lat=${encodeURIComponent(latitude)}` +
-      `&lon=${encodeURIComponent(longitude)}`;
+      `&lon=${encodeURIComponent(longitude)}` +
+      `&maxTravel=${encodeURIComponent(Number(data()?.maxTravel || 60))}`;
 
     const response = await fetch(apiUrl);
 
@@ -844,6 +845,7 @@ function buildAIConditions(){
     outingMode:"standard",
     durationHours,
     budgetYen:Number.isFinite(Number(c.budget))?Number(c.budget):null,
+    maxTravelMinutes:Number.isFinite(Number(c.maxTravel))?Number(c.maxTravel):null,
     childAgeText:String(c.childAge||""),
     indoorOutdoor:c.indoor?"屋内優先":"どちらでも",
     note:[
@@ -1432,6 +1434,10 @@ const shortenedForReturnTime =
 
 async function generateAIPlansV12(){
   const status=$("#aiPlanStatus");
+
+  // v2.0: 最大移動時間を変えた場合も、その条件で候補を取り直す
+  await testGoogleV10();
+
   if(!latestWeekendCandidates.length){
     if(status)status.textContent="先に現在地から実在スポットを取得してください";
     return;
