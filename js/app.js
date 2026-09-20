@@ -1233,7 +1233,7 @@ if (!currentPosition) {
       return `${String(Math.floor(n/60)).padStart(2,"0")}:${String(n%60).padStart(2,"0")}`;
     };
     const startBaby=toMinutesBaby(baby.startTime);
-    const returnBaby=toMinutesBaby(baby.endTime);
+    const returnBaby=toMinutes(c.endTime);
 
     if(baby.babyChildPace==="relaxed"){
       timeline.push({
