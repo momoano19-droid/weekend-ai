@@ -1552,7 +1552,8 @@ async function testGoogleV10() {
     const apiUrl =
       `${WEEKEND_AI_API}/spots-v10` +
       `?lat=${encodeURIComponent(latitude)}` +
-      `&lon=${encodeURIComponent(longitude)}`;
+      `&lon=${encodeURIComponent(longitude)}` +
+      `&maxTravel=${encodeURIComponent(Number(data()?.maxTravel || 60))}`;
 
     const response = await fetch(apiUrl);
 
