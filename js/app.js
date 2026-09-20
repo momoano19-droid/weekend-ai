@@ -1225,7 +1225,7 @@ if (!currentPosition) {
     // v1.9: 赤ちゃん設定を実際に表示するタイムラインへ追加
     const baby=data();
     const toMinutesBaby=(value)=>{
-      const m=String(value||"").match(/^(\\d{1,2}):(\\d{2})$/);
+      const m=String(value||"").match(/^(\d{1,2}):(\d{2})$/);
       return m ? Number(m[1])*60+Number(m[2]) : null;
     };
     const formatMinutesBaby=(minutes)=>{
@@ -1233,7 +1233,7 @@ if (!currentPosition) {
       return `${String(Math.floor(n/60)).padStart(2,"0")}:${String(n%60).padStart(2,"0")}`;
     };
     const startBaby=toMinutesBaby(baby.startTime);
-    const returnBaby=toMinutes(c.endTime);
+    const returnBaby=toMinutesBaby(baby.endTime);
 
     if(baby.babyChildPace==="relaxed"){
       timeline.push({
@@ -1253,9 +1253,9 @@ if (!currentPosition) {
       });
     }
 
-    if(baby.milkEnabled && startBaby!==null && returnBaby!==null){
+    if(baby.babyMilkEnabled===true && startBaby!==null && returnBaby!==null){
       const interval=Math.max(60,Number(baby.babyMilkInterval||4)*60);
-      for(let t=start+interval;t<=returnBaby;t+=interval){
+      for(let t=startBaby+interval;t<=returnBaby;t+=interval){
         timeline.push({
           time:formatMinutesBaby(t),
           type:"milk",
