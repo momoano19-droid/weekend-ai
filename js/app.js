@@ -984,8 +984,6 @@ async function openAIPlan(p){
     );
     const result=await response.json().catch(()=>null);
 
-    if(status) status.textContent=`診断 4/5：/plans-v12 HTTP ${response.status}`;
-
     if(!response.ok||!result?.ok){
       const detail=result?.detail||result?.error||`HTTP ${response.status}`;
       throw new Error(`/plans-v12 HTTP ${response.status}：${detail}`);
@@ -1571,26 +1569,26 @@ async function testGoogleV10(options={}) {
 
     const response = await fetch(apiUrl);
 
-    const data = await response.json().catch(()=>null);
+    const resultData = await response.json().catch(()=>null);
 
     const aiStatusDiag=$("#aiPlanStatus");
     if(aiStatusDiag) aiStatusDiag.textContent=`診断 2/5：/spots-v10 HTTP ${response.status}`;
 
-    if (!response.ok || !data?.ok) {
+    if (!response.ok || !resultData?.ok) {
       throw new Error(
-        data?.detail ||
-        data?.error ||
+        resultData?.detail ||
+        resultData?.error ||
         `HTTP ${response.status}`
       );
     }
 
     const spots =
-      Array.isArray(data.spots)
-        ? data.spots
+      Array.isArray(resultData.spots)
+        ? resultData.spots
         : [];
 
     const originalCount =
-      Number(data.originalCount) || 0;
+      Number(resultData.originalCount) || 0;
 
     latestWeekendCandidates = spots;
     const aiStatus=$("#aiPlanStatus");
@@ -1739,8 +1737,8 @@ ${
       httpStatus:response.status,
       count:spots.length,
       originalCount,
-      maxTravel:Number(data?.maxTravelMinutes ?? data?.maxTravel ?? window.data?.()?.maxTravel ?? 60),
-      version:String(data?.version||"")
+      maxTravel:Number(resultData?.maxTravelMinutes ?? resultData?.maxTravel ?? data()?.maxTravel ?? 60),
+      version:String(resultData?.version||"")
     };
 
   } catch (error) {
