@@ -673,19 +673,19 @@ async function testGoogleV09() {
 
     const response = await fetch(apiUrl);
 
-    const data = await response.json();
+    const apiData = await response.json();
 
-    if (!response.ok || !data.ok) {
+    if (!response.ok || !apiData.ok) {
       throw new Error(
-        data?.detail ||
-        data?.error ||
+        apiData?.detail ||
+        apiData?.error ||
         `HTTP ${response.status}`
       );
     }
 
     const spots =
-      Array.isArray(data.spots)
-        ? data.spots
+      Array.isArray(apiData.spots)
+        ? apiData.spots
         : [];
 
     // --------------------------------------------
@@ -983,6 +983,8 @@ async function openAIPlan(p){
       `${WEEKEND_AI_API}/place-details-v13?placeId=${encodeURIComponent(s.id)}`
     );
     const result=await response.json().catch(()=>null);
+
+    if(status) status.textContent=`診断 4/5：/plans-v12 HTTP ${response.status}`;
 
     if(!response.ok||!result?.ok){
       const detail=result?.detail||result?.error||`HTTP ${response.status}`;
@@ -1569,26 +1571,26 @@ async function testGoogleV10(options={}) {
 
     const response = await fetch(apiUrl);
 
-    const resultData = await response.json().catch(()=>null);
+    const apiData = await response.json().catch(()=>null);
 
     const aiStatusDiag=$("#aiPlanStatus");
     if(aiStatusDiag) aiStatusDiag.textContent=`診断 2/5：/spots-v10 HTTP ${response.status}`;
 
-    if (!response.ok || !resultData?.ok) {
+    if (!response.ok || !apiData?.ok) {
       throw new Error(
-        resultData?.detail ||
-        resultData?.error ||
+        apiData?.detail ||
+        apiData?.error ||
         `HTTP ${response.status}`
       );
     }
 
     const spots =
-      Array.isArray(resultData.spots)
-        ? resultData.spots
+      Array.isArray(apiData.spots)
+        ? apiData.spots
         : [];
 
     const originalCount =
-      Number(resultData.originalCount) || 0;
+      Number(apiData.originalCount) || 0;
 
     latestWeekendCandidates = spots;
     const aiStatus=$("#aiPlanStatus");
@@ -1737,8 +1739,8 @@ ${
       httpStatus:response.status,
       count:spots.length,
       originalCount,
-      maxTravel:Number(resultData?.maxTravelMinutes ?? resultData?.maxTravel ?? data()?.maxTravel ?? 60),
-      version:String(resultData?.version||"")
+      maxTravel:Number(apiData?.maxTravelMinutes ?? apiData?.maxTravel ?? data()?.maxTravel ?? 60),
+      version:String(apiData?.version||"")
     };
 
   } catch (error) {
