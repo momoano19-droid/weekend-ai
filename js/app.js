@@ -1437,6 +1437,64 @@ const shortenedForReturnTime =
   }
 }
 
+
+function buildSpotDiagnosticV208(apiData={}, spots=[]){
+  const num=(...keys)=>{
+    for(const key of keys){
+      const v=Number(apiData?.[key]);
+      if(Number.isFinite(v)) return v;
+    }
+    return null;
+  };
+
+  const placesCount=num(
+    "placesCandidateCount",
+    "placesCount",
+    "googlePlacesCount",
+    "originalCount",
+    "rawCandidateCount"
+  );
+
+  const routesSuccess=num(
+    "routesSuccessCount",
+    "routeSuccessCount",
+    "driveTimeSuccessCount",
+    "verifiedCount"
+  );
+
+  const withinLimit=num(
+    "withinLimitCount",
+    "withinTravelCount",
+    "filteredCount",
+    "eligibleCount"
+  );
+
+  const finalCount=Array.isArray(spots)?spots.length:0;
+  const verifiedFromSpots=Array.isArray(spots)
+    ? spots.filter(x=>x?.driveTimeVerified===true || Number.isFinite(Number(x?.driveMinutes))).length
+    : 0;
+
+  return {
+    placesCount,
+    routesSuccess:routesSuccess ?? verifiedFromSpots,
+    withinLimit:withinLimit ?? finalCount,
+    finalCount,
+    maxTravel:Number(apiData?.maxTravelMinutes ?? apiData?.maxTravel ?? data()?.maxTravel ?? 60),
+    version:String(apiData?.version||"")
+  };
+}
+
+function diagnosticTextV208(diag={}){
+  const show=v=>Number.isFinite(Number(v))?String(Number(v)):"取得なし";
+  return [
+    `Places候補：${show(diag.placesCount)}件`,
+    `Routes成功：${show(diag.routesSuccess)}件`,
+    `時間内：${show(diag.withinLimit)}件`,
+    `AI送信：${show(diag.finalCount)}件`,
+    `上限：${show(diag.maxTravel)}分`
+  ].join(" / ");
+}
+
 async function generateAIPlansV12(){
   const status=$("#aiPlanStatus");
 
@@ -1451,7 +1509,15 @@ async function generateAIPlansV12(){
     return;
   }
 
-  if(status) status.textContent=`診断 3/5：候補 ${latestWeekendCandidates.length}件取得 → AIへ送信します`;
+  const diagV208=spotDiag?.diagnostics||{
+    placesCount:spotDiag?.originalCount,
+    routesSuccess:latestWeekendCandidates.filter(x=>x?.driveTimeVerified===true || Number.isFinite(Number(x?.driveMinutes))).length,
+    withinLimit:latestWeekendCandidates.length,
+    finalCount:latestWeekendCandidates.length,
+    maxTravel:spotDiag?.maxTravel
+  };
+
+  if(status) status.textContent=`診断 3/5：${diagnosticTextV208(diagV208)}`;
 
   if(!latestWeekendCandidates.length){
     if(status)status.textContent="診断停止：/spots-v10 は成功しましたが候補が0件です";
@@ -1486,7 +1552,7 @@ async function generateAIPlansV12(){
     if(plans.length!==3)throw new Error("3プランを取得できませんでした");
 
     renderAIPlans(plans);
-    if(status)status.textContent=`診断 5/5：成功 ✓ 実在候補${result.candidateCount||latestWeekendCandidates.length}件から3プラン作成`;
+    if(status)status.textContent=`診断 5/5：成功 ✓ ${diagnosticTextV208({...diagV208,finalCount:Number(result.candidateCount||latestWeekendCandidates.length)})}`;
   }catch(error){
     console.error("v1.2 AIプラン生成エラー",error);
     if(status)status.textContent=`AIプラン生成エラー：${error?.message||"不明なエラー"}`;
@@ -1594,6 +1660,8 @@ async function testGoogleV10(options={}) {
     const originalCount =
       Number(apiData.originalCount) || 0;
 
+    const spotDiagnosticsV208=buildSpotDiagnosticV208(apiData,spots);
+
     latestWeekendCandidates = spots;
     const aiStatus=$("#aiPlanStatus");
     if(aiStatus)aiStatus.textContent="実在スポット取得完了。上の「いつもの条件でAI提案」で3プランを作れます";
@@ -1603,7 +1671,7 @@ async function testGoogleV10(options={}) {
     // --------------------------------------------
     if (status) {
       status.textContent =
-        `v1.1：${originalCount}件 → ${spots.length}件に厳選`;
+        `診断：${diagnosticTextV208(spotDiagnosticsV208)}`;
     }
 
     if (!cards) {
@@ -1742,7 +1810,8 @@ ${
       count:spots.length,
       originalCount,
       maxTravel:Number(apiData?.maxTravelMinutes ?? apiData?.maxTravel ?? data()?.maxTravel ?? 60),
-      version:String(apiData?.version||"")
+      version:String(apiData?.version||""),
+      diagnostics:spotDiagnosticsV208
     };
 
   } catch (error) {
