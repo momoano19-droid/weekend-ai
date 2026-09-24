@@ -871,12 +871,14 @@ function renderAIPlans(plans){
   box.innerHTML=latestAIPlans.map((p,i)=>{
     const s=p.spot||{};
     const d=Number(s.distanceKm);
-    const distance=Number.isFinite(d)?`${d.toFixed(1)} km`:"距離情報なし";
+    const distance=Number.isFinite(d)?`${d.toFixed(1)} km`:"";
+    const drive=Number(s.driveMinutes);
+    const driveText=Number.isFinite(drive)&&drive>0?`🚗 約${Math.round(drive)}分${distance?`・${distance}`:""}`:(distance?`📍 ${distance}`:"距離情報なし");
     const r=Number(s.rating);
     const rating=Number.isFinite(r)&&r>0?`⭐ ${r.toFixed(1)}`:"";
     const reviews=Number(s.userRatingCount);
     const reviewText=Number.isFinite(reviews)&&reviews>0?`口コミ ${reviews.toLocaleString("ja-JP")}件`:"";
-    const meta=[distance,rating,reviewText].filter(Boolean);
+    const meta=[driveText,rating,reviewText].filter(Boolean);
 
     return `<article class="plan-card">
       <div class="plan-photo">${aiPlanEmoji(p.type,s)}</div>
