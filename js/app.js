@@ -984,8 +984,11 @@ async function openAIPlan(p){
     );
     const result=await response.json().catch(()=>null);
 
+    if(status) status.textContent=`診断 4/5：/plans-v12 HTTP ${response.status}`;
+
     if(!response.ok||!result?.ok){
-      throw new Error(result?.detail||result?.error||`HTTP ${response.status}`);
+      const detail=result?.detail||result?.error||`HTTP ${response.status}`;
+      throw new Error(`/plans-v12 HTTP ${response.status}：${detail}`);
     }
 
     const place=result.place||{};
@@ -1435,11 +1438,22 @@ const shortenedForReturnTime =
 async function generateAIPlansV12(){
   const status=$("#aiPlanStatus");
 
-  // v2.0: 最大移動時間を変えた場合も、その条件で候補を取り直す
-  await testGoogleV10();
+  // 診断版: 候補取得の結果を必ず受け取り、どこで止まったか画面に表示する
+  if(status) status.textContent="診断 1/5：候補スポットを取得中…";
+  const spotDiag = await testGoogleV10({ diagnostic:true });
+
+  if(!spotDiag?.ok){
+    const msg = spotDiag?.error || "候補スポットの取得に失敗しました";
+    if(status) status.textContent=`診断停止：${msg}`;
+    $("#planCards").innerHTML=`<div class="spot-loading">⚠️ 診断結果<br><small>${escapeHtmlGoogle(msg)}</small></div>`;
+    return;
+  }
+
+  if(status) status.textContent=`診断 3/5：候補 ${latestWeekendCandidates.length}件取得 → AIへ送信します`;
 
   if(!latestWeekendCandidates.length){
-    if(status)status.textContent="先に現在地から実在スポットを取得してください";
+    if(status)status.textContent="診断停止：/spots-v10 は成功しましたが候補が0件です";
+    $("#planCards").innerHTML=`<div class="spot-loading">⚠️ 診断結果<br><small>/spots-v10 HTTP ${spotDiag.httpStatus} / 候補0件 / maxTravel=${escapeHtmlGoogle(String(spotDiag.maxTravel))}分</small></div>`;
     return;
   }
 
@@ -1470,7 +1484,7 @@ async function generateAIPlansV12(){
     if(plans.length!==3)throw new Error("3プランを取得できませんでした");
 
     renderAIPlans(plans);
-    if(status)status.textContent=`v1.2 AI：実在候補${result.candidateCount||latestWeekendCandidates.length}件から3プラン作成`;
+    if(status)status.textContent=`診断 5/5：成功 ✓ 実在候補${result.candidateCount||latestWeekendCandidates.length}件から3プラン作成`;
   }catch(error){
     console.error("v1.2 AIプラン生成エラー",error);
     if(status)status.textContent=`AIプラン生成エラー：${error?.message||"不明なエラー"}`;
@@ -1485,7 +1499,7 @@ async function generateAIPlansV12(){
   }
 }
 
-async function testGoogleV10() {
+async function testGoogleV10(options={}) {
   const status = document.getElementById("spotStatus");
   const cards = document.getElementById("realSpotCards");
 
@@ -1520,7 +1534,7 @@ async function testGoogleV10() {
       `;
     }
 
-    return;
+    return {ok:false,stage:"location",error:"保存された現在地がありません"};
   }
 
   const latitude = Number(coords.latitude);
@@ -1557,9 +1571,12 @@ async function testGoogleV10() {
 
     const response = await fetch(apiUrl);
 
-    const data = await response.json();
+    const data = await response.json().catch(()=>null);
 
-    if (!response.ok || !data.ok) {
+    const aiStatusDiag=$("#aiPlanStatus");
+    if(aiStatusDiag) aiStatusDiag.textContent=`診断 2/5：/spots-v10 HTTP ${response.status}`;
+
+    if (!response.ok || !data?.ok) {
       throw new Error(
         data?.detail ||
         data?.error ||
@@ -1716,6 +1733,16 @@ ${
       })
       .join("");
 
+    return {
+      ok:true,
+      stage:"spots",
+      httpStatus:response.status,
+      count:spots.length,
+      originalCount,
+      maxTravel:Number(data?.maxTravelMinutes ?? data?.maxTravel ?? window.data?.()?.maxTravel ?? 60),
+      version:String(data?.version||"")
+    };
+
   } catch (error) {
     console.error(
       "v1.0 おすすめ候補エラー",
@@ -1740,6 +1767,7 @@ ${
         </div>
       `;
     }
+    return {ok:false,stage:"spots",error:error?.message||"不明なエラー"};
   }
 }
 
